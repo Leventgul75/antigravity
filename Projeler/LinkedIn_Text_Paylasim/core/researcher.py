@@ -52,7 +52,7 @@ class Researcher:
         return self._query_perplexity(prompt)
 
     def _query_perplexity(self, prompt: str) -> str:
-        """Perplexity API'ye sorgu gönderir ve sonucu döndürür."""
+        """Perplexity API'ye sorgu gönderir ve sonucu döndürür (3 deneme ile)."""
         if settings.IS_DRY_RUN:
             logging.info(f"[DRY-RUN] Perplexity sorgusu atlanıyor. Prompt: {prompt[:100]}...")
             return "[DRY-RUN] Bu hafta AI dünyasında önemli gelişmeler yaşandı. OpenAI yeni modelini tanıttı."
@@ -69,13 +69,21 @@ class Researcher:
             ]
         }
 
-        try:
-            resp = requests.post(url, headers=headers, json=payload, timeout=60)
-            resp.raise_for_status()
-            data = resp.json()
-            content = data["choices"][0]["message"]["content"]
-            logging.info(f"Perplexity araştırması tamamlandı ({len(content)} karakter)")
-            return content
-        except Exception as e:
-            logging.error(f"Perplexity API hatası: {e}", exc_info=True)
-            raise
+        import time
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                resp = requests.post(url, headers=headers, json=payload, timeout=60)
+                resp.raise_for_status()
+                data = resp.json()
+                content = data["choices"][0]["message"]["content"]
+                logging.info(f"Perplexity araştırması tamamlandı ({len(content)} karakter)")
+                return content
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    wait = (attempt + 1) * 5
+                    logging.warning(f"Perplexity denemesi {attempt+1} başarısız: {e}. {wait}s bekleniyor...")
+                    time.sleep(wait)
+                else:
+                    logging.error(f"Perplexity API hatası (tüm denemeler tükendi): {e}", exc_info=True)
+                    raise

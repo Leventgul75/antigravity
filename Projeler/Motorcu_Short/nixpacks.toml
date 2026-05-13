@@ -1,0 +1,6 @@
+# Python version
+python-3.12
+
+[phases.install]
+dependsOn = ["setup"]
+cmds = ["pip install -r requirements.txt"]

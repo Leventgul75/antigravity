@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+env/
+
+# Gizli dosyalar
+.env
+*.env
+config.env
+.imgbb_cache.json
+
+# Output videolari (buyuk dosyalar)
+output_*.mp4
+motorcu_levent*.mp4
+
+# Logs (opsiyonel — Railway loglarinda gorunur)
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

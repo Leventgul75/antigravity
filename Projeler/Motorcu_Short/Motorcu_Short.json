@@ -1,0 +1,1031 @@
+{
+  "name": "Motorcu_Short",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -224,
+        128
+      ],
+      "id": "60e495a8-c642-4fbd-b0a3-5abf654a8413",
+      "name": "Telegram Trigger",
+      "webhookId": "df2b7063-020e-464e-bbb9-0f288c536849",
+      "credentials": {
+        "telegramApi": {
+          "id": "8Bt8bN52TSnjiuxX",
+          "name": "Telegram account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.toolThink",
+      "typeVersion": 1,
+      "position": [
+        -2688,
+        -176
+      ],
+      "id": "137a4086-9731-4977-834b-0994bf7762d2",
+      "name": "Think"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"title\": {\n      \"type\": \"string\",\n      \"description\": \"A short, exciting, descriptive, simplistic YouTube Shorts title\"\n    },\n    \"description\": {\n      \"type\": \"string\",\n      \"description\": \"1–3 sentences summarizing the crazy water event\"\n    },\n    \"prompt\": {\n      \"type\": \"string\",\n      \"description\": \"A detailed AI video generation prompt\"\n    }\n  },\n  \"required\": [\"title\", \"description\", \"prompt\"]\n}\n",
+        "autoFix": true
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -2592,
+        -128
+      ],
+      "id": "619b9001-077a-422a-93c6-2ab1487ef097",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -736,
+        -384
+      ],
+      "id": "b877bcaa-0450-4acf-9333-95fab21b66d5",
+      "name": "Videoyu Indir",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c7de4991-a871-43b8-831f-180b244d9ef2",
+              "name": "video_title",
+              "value": "={{ $('Prompt Üretici - İngilizce').item.json.output.title }}",
+              "type": "string"
+            },
+            {
+              "id": "bf963e93-4e9a-415a-814b-6746c96c43e9",
+              "name": "video_description",
+              "value": "={{ $('Prompt Üretici - İngilizce').item.json.output.description }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -528,
+        -384
+      ],
+      "id": "ded29763-b266-4dc0-8fd3-7b687457d925",
+      "name": "Baslik ve Aciklamayı Al"
+    },
+    {
+      "parameters": {
+        "content": "## Instagram Reels",
+        "height": 224,
+        "width": 336,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -336,
+        -704
+      ],
+      "typeVersion": 1,
+      "id": "70b14ae6-70d8-4631-af80-cebdf3eaabb4",
+      "name": "Sticky Note7"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.upload-post.com/api/upload",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Apikey eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InNhcmtveUBnbWFpbC5jb20iLCJleHAiOjQ5Mjc3MTM2NTIsImp0aSI6ImRmZDY0NGI1LTVlZGYtNGYxYS04MjhhLWQ0MGQ1MDk5YzBmOCJ9.tCjvy9PeuZ-lJt0ulhqZxX_EpYjOMwkLU0UFHxDK3N0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "title",
+              "value": "={{ $json.video_title }}"
+            },
+            {
+              "name": "user",
+              "value": "leventgul"
+            },
+            {
+              "name": "platform[]",
+              "value": "instagram"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "video",
+              "inputDataFieldName": "=data"
+            },
+            {
+              "name": "media_type",
+              "value": "REELS"
+            },
+            {
+              "name": "share_to_feed",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -224,
+        -640
+      ],
+      "id": "0e3062ed-b20c-4283-8eff-70768d4e224a",
+      "name": "Instagram Reels"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.upload-post.com/api/upload",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Apikey eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InNhcmtveUBnbWFpbC5jb20iLCJleHAiOjQ5Mjc3MTM2NTIsImp0aSI6ImRmZDY0NGI1LTVlZGYtNGYxYS04MjhhLWQ0MGQ1MDk5YzBmOCJ9.tCjvy9PeuZ-lJt0ulhqZxX_EpYjOMwkLU0UFHxDK3N0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "title",
+              "value": "={{ $json.video_title }}"
+            },
+            {
+              "name": "user",
+              "value": "leventgul"
+            },
+            {
+              "name": "platform[]",
+              "value": "tiktok"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "video",
+              "inputDataFieldName": "=data"
+            },
+            {
+              "name": "privacy_level",
+              "value": "PUBLIC_TO_EVERYONE"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -224,
+        -128
+      ],
+      "id": "03dab06e-a7f7-4b2a-a172-23b013116df7",
+      "name": "TikTok"
+    },
+    {
+      "parameters": {
+        "resource": "video",
+        "operation": "upload",
+        "title": "={{ $json.video_title }}\n",
+        "regionCode": "TR",
+        "categoryId": "15",
+        "options": {
+          "description": "={{ $json.video_description }}\n",
+          "privacyStatus": "public",
+          "selfDeclaredMadeForKids": false
+        }
+      },
+      "type": "n8n-nodes-base.youTube",
+      "typeVersion": 1,
+      "position": [
+        -224,
+        -384
+      ],
+      "id": "7ca026f4-dfbd-4b67-8e26-c5350265bed8",
+      "name": "YouTube Shorts",
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "BGSHmaekN9n3TQr1",
+          "name": "YouTube account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## TikTok",
+        "height": 224,
+        "width": 336,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -336,
+        -192
+      ],
+      "typeVersion": 1,
+      "id": "45e40e75-c5b3-4783-8eb0-fb8343c817c8",
+      "name": "Sticky Note8"
+    },
+    {
+      "parameters": {
+        "content": "## YouTube Shorts",
+        "height": 224,
+        "width": 336,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -336,
+        -448
+      ],
+      "typeVersion": 1,
+      "id": "60c22fa7-cce2-4ce0-bfb6-0032ae188946",
+      "name": "Sticky Note9"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 5
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -3184,
+        -336
+      ],
+      "id": "15b8561e-0a63-4a8d-92f2-10da92e530ea",
+      "name": "Otomatik Çalış"
+    },
+    {
+      "parameters": {
+        "jsCode": "const min = 1; // minimum value\nconst max = 6; // maximum value\nconst randomNumber = Math.floor(Math.random() * (max - min + 1)) + min;\nreturn [{ json: { randomNumber } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2944,
+        -336
+      ],
+      "id": "3a222234-ba28-4e11-bcd5-833d518bed65",
+      "name": "Sayı Üret"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Generate a prompt for {{ $json.randomNumber }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=You are an AI that generates random video prompts for short-form content.\n\nYour ONLY output must strictly follow this JSON structure:\n\n{\n  \"title\": \"Kısa, çarpıcı, anlaşılır Türkçe başlık\",\n  \"description\": \"Türkçe, 1–3 cümlelik özet\",\n  \"prompt\": \"English-only AI video generation prompt\"\n}\n\nHard rules:\n- Output JSON only. No extra keys, comments, or trailing text.\n- \"title\" MUST be in Turkish (short, eye-catching, simple).\n- \"description\" MUST be in Turkish (1–3 sentences, olayın kısa özeti).\n- \"prompt\" MUST be written in English ONLY.\n- In the English prompt, you MUST clearly instruct: \n  * all spoken dialogue in the video is in Turkish,\n  * use natural, everyday Istanbul Turkish,\n  * short lines (≈6–10 words), emotionally engaging,\n  * avoid heavy slang and profanity unless the scenario inherently requires it.\n  Example directive to include (English): \n  \"All spoken dialogue must be in Turkish. Use natural, everyday Istanbul Turkish with short, emotionally engaging lines.\"\n- Every prompt must describe a BODYCAM video.\n- Never repeat a video idea consecutively; always rotate types.\n- Never break JSON format. Never add extra text or explanations outside the JSON.\n\nMain Video Types (choose one randomly each time):\n1. Motorcyclist rescues someone from flood\n2. Motorcyclist without license plate and chased by police\n3. Motorcyclist brakes suddenly and is chased by police; Elderly motorcyclist falls during chase\n4. Motorcyclist stopped for not wearing a helmet, then eventually escapes\n5. Motorcyclist stopped for not wearing gloves, then eventually escapes\n6. Motorcyclist who runs a red light is stopped, says \"sorry sir\", then escapes from police\nPrompt guidance (still write in English):\n\n- Concise but vivid camera description (bodycam, handheld, POV details, environment, time of day, weather, pacing).\n- Character(s), setting, key beats, and emotional tone.\n- Action choreography suitable for a 9–20s vertical short.\n- Audio: specify \"Turkish dialogue only\", realistic SFX, ambient noise; music style if helpful.\n- Visual clarity: lighting, motion, depth, focal length cues; avoid text overlays unless essential.\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        -2784,
+        -336
+      ],
+      "id": "6b9ceca9-eb5f-4d65-b624-112f52e5c6e9",
+      "name": "Prompt Üretici - İngilizce",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map(({ json }) => {\n  const raw =\n    json.resultJson ?? json.data?.resultJson ?? json.param?.resultJson;\n  let url = null;\n\n  try {\n    const obj = typeof raw === \"string\" ? JSON.parse(raw) : raw;\n    if (Array.isArray(obj?.resultUrls) && obj.resultUrls.length) {\n      url = obj.resultUrls[0];\n    } else if (obj?.resultUrl) {\n      url = obj.resultUrl;\n    } else if (obj?.url) {\n      url = obj.url;\n    }\n  } catch {\n    const m = String(raw ?? \"\").match(/https?:\\/\\/[^\\s\"']+/);\n    url = m ? m[0] : null;\n  }\n\n  return { json: { url } };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -944,
+        -384
+      ],
+      "id": "3c485398-adc5-45cd-9119-fc79d1526c41",
+      "name": "URL'yi Temizle"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "a96f17f2-5967-4b13-acc9-4d41f226453b",
+                    "leftValue": "={{ $json.data.state }}",
+                    "rightValue": "=success",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "success"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "52ad92ea-901f-4af8-a462-84b045dd2803",
+                    "leftValue": "={{ $json.data.state }}",
+                    "rightValue": "ing",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "in progress"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -1568,
+        -352
+      ],
+      "id": "d4b35726-9579-4a10-9a62-282748fb4dea",
+      "name": "Video Üretim Kontrol",
+      "executeOnce": false,
+      "alwaysOutputData": false,
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "url": "https://api.kie.ai/api/v1/jobs/recordInfo",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "taskId",
+              "value": "={{ $json.data.taskId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1760,
+        -336
+      ],
+      "id": "cfeb5d66-6793-408b-8648-8b243f57c1ae",
+      "name": "Videoyu Al",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ByT1EXxQEnEVn3En",
+          "name": "KIEAI2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Videoları Üret",
+        "height": 480,
+        "width": 912,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -2288,
+        -448
+      ],
+      "typeVersion": 1,
+      "id": "d33c61e4-70d1-4f8e-a631-712161acba74",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Paylaşıma Hazırlanıyor...",
+        "height": 480,
+        "width": 928,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1312,
+        -448
+      ],
+      "typeVersion": 1,
+      "id": "3d631301-1565-4860-9a14-d63fa465e33f",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## Video Üretim Sıklığı",
+        "height": 480
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -3248,
+        -432
+      ],
+      "typeVersion": 1,
+      "id": "683f78ce-2d44-4c3f-82c7-d1ed94821d74",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "## Senaryo Üretimi\n",
+        "height": 480,
+        "width": 672,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -2992,
+        -432
+      ],
+      "typeVersion": 1,
+      "id": "cb44603a-e411-4cf5-8eda-f2f7b4f33573",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "amount": 90
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -1952,
+        -336
+      ],
+      "id": "1d849c06-98ec-4dc1-a97e-12b4056dd805",
+      "name": "Bekle 90 Saniye",
+      "webhookId": "ffc8167e-ac5b-4413-8b01-d2326c09b5d2"
+    },
+    {
+      "parameters": {
+        "content": "### Kei AI API Anahtarınızı Alın\n1. [Kie AI](https://kie.ai?ref=c29fcd9c92ad897e8868df9182112560)'a gidin  ve üye olun\n2. \"Billing\" bölümünden kredi satın alın\n3. \"API Key\" bölümünden anahtarınızı alın\n4. Aşağıdaki \"Klip Oluştur\" ve \"Oluşturulan Klipleri Al\" Node'larındaki ilgili yere API anahtarınızı yapıştırın.",
+        "height": 240,
+        "width": 336,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -2288,
+        -688
+      ],
+      "typeVersion": 1,
+      "id": "d911c034-9525-476d-8a47-a1b6733e3cf5",
+      "name": "Sticky Note12"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4.1",
+          "mode": "list",
+          "cachedResultName": "gpt-4.1"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -2784,
+        -64
+      ],
+      "id": "7b4a0f98-0d24-4827-ac3f-8190e79c88cf",
+      "name": "ChatGPT 4.1",
+      "credentials": {
+        "openAiApi": {
+          "id": "tCLZODj9Hk97vW9c",
+          "name": "Youtube"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## OpenAI Bağlayın \n1. platform.openai.com'a gidin\n2. Ücretsiz üye olun\n3. Ayarlar > Billing kısmından bakiye yükleyin\n4. Ayalar > API Keys kısmından API alın",
+        "height": 240,
+        "width": 224,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -2784,
+        -688
+      ],
+      "typeVersion": 1,
+      "id": "945b3846-c46a-4911-8257-2c93ac9e8bc8",
+      "name": "Sticky Note6"
+    },
+    {
+      "parameters": {
+        "content": "### YouTube Kanalınızı Bağlayın\n1. cloud.google.com'ı ziyaret edin, console'a gidin ve YouTube Data V3 API'ın açık olduğundan emin olun\n2. Audience bölümünden YouTube kanalınızın bağlı olduğu email adresini test user olarak ekleyin\n3. \"APIs & Services\" > \"Oauth Consent Screen\" > \"Client\" bölümünden bir application oluşturun ve aşağıdaki node'a bu bilgileri yapıştırın\n4. Google hesabınız ile kanala giriş yapın",
+        "height": 224,
+        "width": 432,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        16,
+        -448
+      ],
+      "typeVersion": 1,
+      "id": "4b1c60d6-d2ce-49eb-8cf1-f48370e66946",
+      "name": "Sticky Note10"
+    },
+    {
+      "parameters": {
+        "content": "### Uplod-post Hesabınızı Bağlayın\n1. [Uplod-post](https://www.upload-post.com/?linkId=lp_144414&sourceId=dolunay&tenantId=upload-post-app) üzerinde ücretsiz üyelik açın (ayda 10 post atmak ücretsiz)\n2. \"API Keys\" sekmesinden API anahtarınızı üretin ve kopyalayın. Node'unuzun içine yapıştırın.\n3. \"Users\" bölümüne gidin ve bir kullanıcı adı ile user oluşturun. Bu kullanıcı adını node'unuza yapıştırın.\n4. Oluşturduğunuz user'a sosyal medya hesaplarınızı bağlayın.\n ",
+        "height": 224,
+        "width": 432,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        16,
+        -704
+      ],
+      "typeVersion": 1,
+      "id": "815c3fd9-a94f-4e2e-99aa-21a94e19ccbd",
+      "name": "Sticky Note14"
+    },
+    {
+      "parameters": {
+        "content": "### Uplod-post Hesabınızı Bağlayın\nYukarıda Instagramınızı bağlamak için ürettiğiniz API anahtarını ve User adını bu node'a da yapıştırmanız gerekmektedir.\n\n(TikTok hesabınızı bağlamak için upload-post'un ücretli sürümüne geçmeniz gerekmektedir)",
+        "height": 224,
+        "width": 432,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        16,
+        -192
+      ],
+      "typeVersion": 1,
+      "id": "3e6e4c9f-d4bc-4743-ba84-f1872ad92051",
+      "name": "Sticky Note15"
+    },
+    {
+      "parameters": {
+        "content": "## Önemli Not\n\n1. Youtube API'ni bir süre kullanmazsanız otomatik olarak bağlantı kopacaktır. Bu noktada yeniden bağlantı kurmanız gerekecektir. Yani eğer uzun bir aradan sonra yeniden Youtube API'yi kullanıyorsanız hata alma ihtimaliniz var. Bunu mutlaka göz önünde bulundurun.\n\n2. Instagram ve TikTok yeni açılan hesapları sıkı bir şekilde denetlemektedir. Bunun sebebi henüz hesabın daha platformda yeni açılmış olması dolayısıyla güvenilir olup olmadığı hakkında platformun yeterince bilgiye sahip olmamasıdır. Bu nedenle eğer yeni bir hesap açıyorsanız bu hesapta otomatik paylaşım yapmak yerine bir süre manuel paylaşım yapmayı öneririm. Gün içinde o hesapta biraz vakit geçirmeniz, başkalarının videolarıyla etkileşime girmeniz ve paylaşımları kendiniz yapmanız tavsiye edilir. Böylece hesabın platform nezdindeki itibarını arttırmış olacaksınız.",
+        "height": 560,
+        "width": 432,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        464,
+        -608
+      ],
+      "typeVersion": 1,
+      "id": "8c626308-c6c2-4e6e-9289-6e802772c57b",
+      "name": "Sticky Note16"
+    },
+    {
+      "parameters": {
+        "content": "Levent Gül, özel notlar ;",
+        "height": 480,
+        "width": 928,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1312,
+        -944
+      ],
+      "typeVersion": 1,
+      "id": "aca82145-3b83-46b6-bbf0-dc6d596403c4",
+      "name": "Sticky Note11"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.kie.ai/api/v1/jobs/createTask",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "input.prompt",
+              "value": "={{ $json.output.prompt }}"
+            },
+            {
+              "name": "input.aspect_ratio",
+              "value": "portrait"
+            },
+            {
+              "name": "model",
+              "value": "sora-2-text-to-video"
+            },
+            {
+              "name": "imput.remove_watermark",
+              "value": "true"
+            },
+            {
+              "name": "input_frames",
+              "value": "10"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1216,
+        -176
+      ],
+      "id": "3f53241d-5afc-4b35-a68c-4af985985a14",
+      "name": "Sora 2 ile Video Üret1",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ByT1EXxQEnEVn3En",
+          "name": "KIEAI2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.kie.ai/api/v1/jobs/recordInfo",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "taskId",
+              "value": "={{ $json.data.taskId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -752,
+        -176
+      ],
+      "id": "72d1c6ef-b85c-48d8-9343-a5ffbe206209",
+      "name": "Videoyu Al1",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "5J9YwGaHjWG6KnH3",
+          "name": "Upload Post"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 90
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -944,
+        -176
+      ],
+      "id": "cbcb2847-07bc-45ab-93c7-1dc3a47423cb",
+      "name": "Bekle 90 Saniye1",
+      "webhookId": "ffc8167e-ac5b-4413-8b01-d2326c09b5d2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.kie.ai/api/v1/jobs/createTask",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "bytedance/seedance-2"
+            },
+            {
+              "name": "input.prompt",
+              "value": "={{ $json.output.prompt }}"
+            },
+            {
+              "name": "input.aspect_ratio",
+              "value": "9:16"
+            },
+            {
+              "name": "input.resolution",
+              "value": "720p"
+            },
+            {
+              "name": "input.duration",
+              "value": "15"
+            },
+            {
+              "name": "input.generate_audio",
+              "value": "true"
+            },
+            {
+              "name": "input.web_search",
+              "value": "false"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -2224,
+        -336
+      ],
+      "id": "b572f5df-ddc9-438e-a075-e410acb62f55",
+      "name": "Seedance 2 ile Video Üret",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ByT1EXxQEnEVn3En",
+          "name": "KIEAI2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Think": {
+      "ai_tool": [
+        [
+          {
+            "node": "Prompt Üretici - İngilizce",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Prompt Üretici - İngilizce",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Videoyu Indir": {
+      "main": [
+        [
+          {
+            "node": "Baslik ve Aciklamayı Al",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baslik ve Aciklamayı Al": {
+      "main": [
+        [
+          {
+            "node": "Instagram Reels",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "YouTube Shorts",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "TikTok",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Otomatik Çalış": {
+      "main": [
+        [
+          {
+            "node": "Sayı Üret",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sayı Üret": {
+      "main": [
+        [
+          {
+            "node": "Prompt Üretici - İngilizce",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompt Üretici - İngilizce": {
+      "main": [
+        [
+          {
+            "node": "Seedance 2 ile Video Üret",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "URL'yi Temizle": {
+      "main": [
+        [
+          {
+            "node": "Videoyu Indir",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Video Üretim Kontrol": {
+      "main": [
+        [
+          {
+            "node": "URL'yi Temizle",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Bekle 90 Saniye",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sora 2 ile Video Üret1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Videoyu Al": {
+      "main": [
+        [
+          {
+            "node": "Video Üretim Kontrol",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bekle 90 Saniye": {
+      "main": [
+        [
+          {
+            "node": "Videoyu Al",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ChatGPT 4.1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Prompt Üretici - İngilizce",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Structured Output Parser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sora 2 ile Video Üret1": {
+      "main": [
+        [
+          {
+            "node": "Bekle 90 Saniye1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bekle 90 Saniye1": {
+      "main": [
+        [
+          {
+            "node": "Videoyu Al1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Videoyu Al1": {
+      "main": [
+        [
+          {
+            "node": "URL'yi Temizle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Seedance 2 ile Video Üret": {
+      "main": [
+        [
+          {
+            "node": "Bekle 90 Saniye",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "b9a5f10e-8fd6-49bd-8c3b-38ad4aad978a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "cd3d10262b737cef7cbd5b2c4f29ad19fc442237d4ca6f0d318ff10db675c2c4"
+  },
+  "id": "JJQ2mqVWDg8kWD0a",
+  "tags": []
+}

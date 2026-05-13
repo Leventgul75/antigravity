@@ -15,11 +15,19 @@ class NotionLogger:
     def __init__(self):
         self.token = settings.NOTION_TOKEN
         self.db_id = settings.NOTION_LINKEDIN_DB_ID
-        self.headers = {
-            "Authorization": f"Bearer {self.token}",
-            "Notion-Version": "2022-06-28",
-            "Content-Type": "application/json"
-        }
+        self.enabled = settings.NOTION_ENABLED
+        if not self.enabled:
+            logging.warning(
+                "NotionLogger: NOTION_TOKEN veya NOTION_LINKEDIN_DB_ID eksik. "
+                "Notion loglama devre dışı bırakıldı (post atılır, log yazılmaz)."
+            )
+            self.headers = {}
+        else:
+            self.headers = {
+                "Authorization": f"Bearer {self.token}",
+                "Notion-Version": "2022-06-28",
+                "Content-Type": "application/json"
+            }
 
     def is_already_posted_this_week(self, post_type: str) -> bool:
         """
@@ -29,6 +37,8 @@ class NotionLogger:
         Args:
             post_type: "Haftalık AI Haberleri" veya "Haftalık AI Tavsiyesi"
         """
+        if not self.enabled:
+            return False
         try:
             # Bu haftanın başlangıcını hesapla (Pazartesi)
             now = datetime.now(timezone.utc)
@@ -93,6 +103,10 @@ class NotionLogger:
         if settings.IS_DRY_RUN:
             logging.info(f"[DRY-RUN] Notion log atlanıyor -> Tip: {post_type}, Status: {status}")
             return True
+
+        if not self.enabled:
+            logging.info(f"[NOTION DISABLED] Skip log -> Tip: {post_type}, Status: {status}, URL: {linkedin_url}")
+            return False
 
         now_iso = datetime.now(timezone.utc).isoformat()
 

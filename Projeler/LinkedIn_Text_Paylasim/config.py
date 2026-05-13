@@ -27,6 +27,15 @@ class Config:
         self.LINKEDIN_ACCESS_TOKEN = self._require_env("LINKEDIN_ACCESS_TOKEN")
         self.LINKEDIN_PERSON_URN = self._require_env("LINKEDIN_PERSON_URN")
 
+        # Notion — Log yazma (opsiyonel — yoksa loglama gracefully skip edilir)
+        # master.env'de NOTION_SOCIAL_TOKEN tercih edilir, yoksa generic NOTION_TOKEN'a düşer.
+        self.NOTION_TOKEN = (
+            os.environ.get("NOTION_SOCIAL_TOKEN")
+            or os.environ.get("NOTION_TOKEN")
+        )
+        self.NOTION_LINKEDIN_DB_ID = os.environ.get("NOTION_LINKEDIN_DB_ID")
+        self.NOTION_ENABLED = bool(self.NOTION_TOKEN and self.NOTION_LINKEDIN_DB_ID)
+
     def _require_env(self, key, default=None):
         """Fetches an environment variable, raises error if missing."""
         val = os.environ.get(key, default)

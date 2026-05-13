@@ -5,20 +5,22 @@ Haftada 2 gün çalışan Diageo odaklı otomasyon:
   2. Pazar (TR 08:00): Diageo Global
 
 Pipeline (her ikisi aynı):
-  Schedule → Perplexity (Araştır) → GPT-4.1 (Post Yaz)
-  → GPT-4.1-mini (Görsel Prompt) → Gemini (Görsel Üret)
-  → LinkedIn API (Paylaş)
+  Schedule → Perplexity (Araştır) → GPT-4o (Post Yaz)
+  → GPT-4o-mini (Görsel Prompt) → Gemini (Görsel Üret)
+  → LinkedIn API (Paylaş) → Notion (Log Yaz)
 """
 import logging
 import os
 import time
 import schedule
+from datetime import datetime
 
 from logger import setup_logging
 from core.researcher import Researcher
 from core.post_writer import PostWriter
 from core.image_generator import ImageGenerator
 from core.linkedin_publisher import LinkedInPublisher
+from core.notion_logger import NotionLogger
 
 def run_diageo_turkey():
     """
@@ -29,19 +31,32 @@ def run_diageo_turkey():
     logging.info("=" * 60)
 
     post_type = "Diageo Türkiye"
+    notion = NotionLogger()
+
+    # Step 0: Duplicate kontrolü
+    if notion.is_already_posted_this_week(post_type):
+        return
+
+    post_text = ""
+    linkedin_url = ""
+    image_path = None
+    status = "Failed"
+    error_msg = ""
+
     try:
+        # Step 1: Perplexity ile araştır
         researcher = Researcher()
         logging.info("Adım 1/5: Perplexity ile Diageo Türkiye haberleri araştırılıyor...")
         research_content = researcher.research_diageo_turkey()
         logging.info(f"Araştırma tamamlandı ({len(research_content)} karakter)")
 
-        # Step 2: GPT-4.1 ile post yaz
+        # Step 2: GPT-4o ile post yaz
         writer = PostWriter()
-        logging.info("Adım 2/5: GPT-4.1 ile LinkedIn postu yazılıyor...")
+        logging.info("Adım 2/5: GPT-4o ile LinkedIn postu yazılıyor...")
         post_text = writer.write_diageo_turkey_post(research_content)
         logging.info(f"Post yazıldı ({len(post_text)} karakter)")
 
-        # Step 3: GPT-4.1-mini ile görsel prompt üret + Gemini ile görsel üret
+        # Step 3: GPT-4o-mini ile görsel prompt üret + Gemini ile görsel üret
         img_gen = ImageGenerator()
         logging.info("Adım 3/5: Görsel prompt üretiliyor + Gemini ile görsel oluşturuluyor...")
         image_path = img_gen.generate_post_image(post_text)
@@ -56,21 +71,33 @@ def run_diageo_turkey():
         post_urn = publisher.create_text_image_post(text=post_text, image_path=image_path)
 
         if post_urn:
+            status = "Success"
             linkedin_url = f"https://www.linkedin.com/feed/update/{post_urn}/"
             logging.info("=" * 60)
             logging.info(f"✅ BAŞARILI: Diageo Türkiye postu paylaşıldı!")
             logging.info(f"LinkedIn URL: {linkedin_url}")
             logging.info("=" * 60)
         else:
-            logging.error("LinkedIn post oluşturulamadı!")
+            error_msg = "LinkedIn API post oluşturamadı."
+            logging.error(error_msg)
 
-        # Temizlik: geçici görsel dosyasını sil
+    except Exception as e:
+        error_msg = str(e)
+        logging.error(f"FATAL: Diageo Türkiye workflow hatası: {e}", exc_info=True)
+    finally:
+        # Step 5: Notion'a logla
+        notion.log_post(
+            post_type=post_type,
+            status=status,
+            post_text=post_text,
+            linkedin_url=linkedin_url,
+            error_message=error_msg
+        )
+
+        # Temizlik
         if image_path and os.path.exists(image_path):
             os.remove(image_path)
             logging.info(f"Geçici görsel silindi: {image_path}")
-
-    except Exception as e:
-        logging.error(f"FATAL: Diageo Türkiye workflow hatası: {e}", exc_info=True)
 
 
 def run_diageo_global():
@@ -82,19 +109,32 @@ def run_diageo_global():
     logging.info("=" * 60)
 
     post_type = "Diageo Global"
+    notion = NotionLogger()
+
+    # Step 0: Duplicate kontrolü
+    if notion.is_already_posted_this_week(post_type):
+        return
+
+    post_text = ""
+    linkedin_url = ""
+    image_path = None
+    status = "Failed"
+    error_msg = ""
+
     try:
+        # Step 1: Perplexity ile araştır
         researcher = Researcher()
         logging.info("Adım 1/5: Perplexity ile Diageo Global haberleri araştırılıyor...")
         research_content = researcher.research_diageo_global()
         logging.info(f"Araştırma tamamlandı ({len(research_content)} karakter)")
 
-        # Step 2: GPT-4.1 ile post yaz
+        # Step 2: GPT-4o ile post yaz
         writer = PostWriter()
-        logging.info("Adım 2/5: GPT-4.1 ile LinkedIn postu yazılıyor...")
+        logging.info("Adım 2/5: GPT-4o ile LinkedIn postu yazılıyor...")
         post_text = writer.write_diageo_global_post(research_content)
         logging.info(f"Post yazıldı ({len(post_text)} karakter)")
 
-        # Step 3: GPT-4.1-mini ile görsel prompt üret + Gemini ile görsel üret
+        # Step 3: GPT-4o-mini ile görsel prompt üret + Gemini ile görsel üret
         img_gen = ImageGenerator()
         logging.info("Adım 3/5: Görsel prompt üretiliyor + Gemini ile görsel oluşturuluyor...")
         image_path = img_gen.generate_post_image(post_text)
@@ -109,28 +149,38 @@ def run_diageo_global():
         post_urn = publisher.create_text_image_post(text=post_text, image_path=image_path)
 
         if post_urn:
+            status = "Success"
             linkedin_url = f"https://www.linkedin.com/feed/update/{post_urn}/"
             logging.info("=" * 60)
             logging.info(f"✅ BAŞARILI: Diageo Global postu paylaşıldı!")
             logging.info(f"LinkedIn URL: {linkedin_url}")
             logging.info("=" * 60)
         else:
-            logging.error("LinkedIn post oluşturulamadı!")
+            error_msg = "LinkedIn API post oluşturamadı."
+            logging.error(error_msg)
+
+    except Exception as e:
+        error_msg = str(e)
+        logging.error(f"FATAL: Diageo Global workflow hatası: {e}", exc_info=True)
+    finally:
+        # Step 5: Notion'a logla
+        notion.log_post(
+            post_type=post_type,
+            status=status,
+            post_text=post_text,
+            linkedin_url=linkedin_url,
+            error_message=error_msg
+        )
 
         # Temizlik
         if image_path and os.path.exists(image_path):
             os.remove(image_path)
             logging.info(f"Geçici görsel silindi: {image_path}")
 
-    except Exception as e:
-        logging.error(f"FATAL: Diageo Global workflow hatası: {e}", exc_info=True)
-
 
 if __name__ == "__main__":
     setup_logging()
 
-    import os
-    from datetime import datetime
     mode = os.environ.get("RUN_MODE", "cron").lower()
 
     if mode == "schedule":

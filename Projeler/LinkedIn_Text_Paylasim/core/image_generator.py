@@ -60,7 +60,7 @@ class ImageGenerator:
 
         try:
             response = self.openai_client.chat.completions.create(
-                model="gpt-4.1-mini",
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "user", "content": user_message}
                 ],
