@@ -1,5 +1,5 @@
 import { app } from 'electron'
-import { mkdirSync, appendFileSync, readFileSync, existsSync, readdirSync } from 'fs'
+import { mkdirSync, appendFileSync, readFileSync, writeFileSync, existsSync, readdirSync } from 'fs'
 import { join } from 'path'
 
 const LOG_DIR_NAME = 'conversations'
@@ -75,6 +75,30 @@ export class ConversationLog {
         .slice(-maxDays)
     } catch {
       return []
+    }
+  }
+
+  /** Belirli bir tarihin logunu okur (YYYY-MM-DD); bugün için boş bırak. */
+  readDay(dateKey?: string): string {
+    const key = dateKey || new Date().toISOString().slice(0, 10)
+    const p = join(logsDir(), `${key}.md`)
+    if (!existsSync(p)) return ''
+    try { return readFileSync(p, 'utf-8') } catch { return '' }
+  }
+
+  /** Verilen tarihin log'unu Masaüstüne kopyalar. */
+  exportToDesktop(dateKey?: string): { ok: boolean; outPath?: string; reason?: string } {
+    const key = dateKey || new Date().toISOString().slice(0, 10)
+    const src = join(logsDir(), `${key}.md`)
+    if (!existsSync(src)) return { ok: false, reason: `${key} için kayıt yok.` }
+    try {
+      const desktop = app.getPath('desktop')
+      const outPath = join(desktop, `Dahakan-Sohbet-${key}.md`)
+      const content = readFileSync(src, 'utf-8')
+      writeFileSync(outPath, content, 'utf-8')
+      return { ok: true, outPath }
+    } catch (err) {
+      return { ok: false, reason: (err as Error).message }
     }
   }
 }

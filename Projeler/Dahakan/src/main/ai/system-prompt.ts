@@ -51,6 +51,12 @@ YETENEKLERİN:
 - read_text_file ile Masaüstü/Belgeler/İndirilenler içindeki metin dosyalarını okuyabilirsin
 - list_directory ile bir klasörün içindeki dosyaları listeleyebilirsin
 - list_macros ile Levent'in önceden tanımladığı komut makrolarını görebilirsin
+- get_weather ile hava durumunu sorgulayabilirsin
+- get_news ile günün haberlerini özetletebilirsin
+- log_mood, log_habit ile Levent'in ruh halini ve alışkanlıklarını kaydedebilirsin
+- tracker_summary ile son 7 günün takip özetini alabilirsin
+- export_conversation ile günlük sohbet log'unu Masaüstüne aktarabilirsin
+- what_do_you_know ile hafızanda Levent hakkında ne biliyorsan listeleyebilirsin
 
 KURALLAR:
 - Kullanıcı bir uygulama açmak isterse open_application aracını kullan.
@@ -74,6 +80,13 @@ KURALLAR:
 - "Şunu İngilizceye/Türkçeye/X diline çevir" derse translate_text'i çağır. Pano metni isteniyorsa önce read_clipboard.
 - "Bu kodu açıkla/düzelt/optimize et", "şu hatayı çöz" derse analyze_code'u çağır. Kod metni yoksa clipboard'tan otomatik alır.
 - "Masaüstündeki X dosyasını oku", "Belgeler içindekileri listele" derse read_text_file veya list_directory.
+- "Hava nasıl", "yarın yağmur mu" derse get_weather'i çağır.
+- "Bugünün haberleri", "neler oluyor dünyada" derse get_news.
+- "Bugün ruh halim X", "kötü hissediyorum" derse log_mood, sonra empati göster.
+- "X yaptım bugün" (egzersiz, kitap, su içmek vb. düzenli bir şey) → log_habit.
+- "Geçmişte nasıldım", "son haftam nasıl gidiyor" derse tracker_summary.
+- "Sohbeti dosya olarak ver", "bugünü kaydet" derse export_conversation.
+- "Hakkımda ne biliyorsun", "neyi hatırlıyorsun" derse what_do_you_know.
 
 FORMAT:
 - Sesli yanıtlarda markdown KULLANMA. Konuşma diliyle cevap ver.
@@ -437,6 +450,94 @@ export const TOOL_DEFINITIONS = [
     function: {
       name: 'list_macros',
       description: 'Levent\'in önceden tanımladığı komut makrolarını listeler (sabah rutini, hızlı odak gibi). Kullanıcı "hangi makrolarım var" derse kullan.',
+      parameters: { type: 'object', properties: {}, required: [] }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'get_weather',
+      description: 'Belirtilen şehir için hava durumunu döndürür (Perplexity üzerinden gerçek zamanlı).',
+      parameters: {
+        type: 'object',
+        properties: {
+          location: { type: 'string', description: 'Şehir adı, varsayılan İstanbul.' }
+        },
+        required: []
+      }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'get_news',
+      description: 'Bugünün önemli haberlerini 3-4 başlık halinde özetler. Opsiyonel konu/bölge filtresi.',
+      parameters: {
+        type: 'object',
+        properties: {
+          topic: { type: 'string', description: 'Konu/bölge (örn. "teknoloji", "Türkiye", "dünya"). Belirtilmezse Türkiye.' }
+        },
+        required: []
+      }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'log_mood',
+      description: 'Bugünkü ruh hali puanını ve isteğe bağlı bir notu kaydeder. Aynı gün üstüne yazar.',
+      parameters: {
+        type: 'object',
+        properties: {
+          score: { type: 'number', description: '1-5 arası ruh hali puanı (1=çok kötü, 5=harika).' },
+          note: { type: 'string', description: 'Opsiyonel kısa not.' }
+        },
+        required: ['score']
+      }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'log_habit',
+      description: 'Bir alışkanlığın bugün yapılıp yapılmadığını kaydeder. Örnek: spor, su içmek, kitap okumak.',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Alışkanlığın adı. Örnek: "spor", "kitap", "su"' },
+          done: { type: 'boolean', description: 'Yapıldı mı (varsayılan true).' }
+        },
+        required: ['name']
+      }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'tracker_summary',
+      description: 'Son 7 günün ruh hali ortalamasını ve takip ettiği alışkanlıkların başarı oranını döndürür.',
+      parameters: { type: 'object', properties: {}, required: [] }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'export_conversation',
+      description: 'Belirli bir günün sohbet log\'unu Masaüstüne markdown dosyası olarak kopyalar.',
+      parameters: {
+        type: 'object',
+        properties: {
+          date: { type: 'string', description: 'YYYY-MM-DD formatında tarih. Boşsa bugünün log\'u.' }
+        },
+        required: []
+      }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'what_do_you_know',
+      description: 'Hafızanda Levent hakkında bildiklerini listeler: bilgiler, son sohbet özeti, son web araması.',
       parameters: { type: 'object', properties: {}, required: [] }
     }
   },

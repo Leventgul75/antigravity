@@ -8,8 +8,16 @@ import { readClipboard, writeClipboard, getActiveWindow, formatActiveWindowForAI
 import { translateText, analyzeCode } from '../features/language'
 import { readTextFile, listDirectory } from '../features/file-ops'
 import { MacroStoreFile, formatMacrosForAI } from '../features/macros'
+import { getWeather, getNewsBriefing, LifestyleTracker } from '../features/lifestyle'
 import type { Memory } from './memory'
 import type { FocusMode } from '../features/focus-mode'
+import type { ConversationLog } from '../features/conversation-log'
+
+// Lifestyle tracker + conversation log singleton'ları
+let lifestyleTracker: LifestyleTracker | null = null
+let conversationLog: ConversationLog | null = null
+export function setLifestyleTracker(t: LifestyleTracker): void { lifestyleTracker = t }
+export function setConversationLog(c: ConversationLog): void { conversationLog = c }
 
 // Macro store singleton — engine startup'ta initialize edilir
 let macroStore: MacroStoreFile | null = null
@@ -230,6 +238,66 @@ export async function executeTool(name: string, args: Record<string, any>): Prom
         if (!macroStore) return 'Makro deposu henüz hazır değil.'
         const all = macroStore.list()
         return formatMacrosForAI(all)
+      }
+
+      case 'get_weather': {
+        const location = (args.location as string || 'İstanbul').trim()
+        return await getWeather(location)
+      }
+
+      case 'get_news': {
+        const topic = (args.topic as string || '').trim() || undefined
+        return await getNewsBriefing(topic)
+      }
+
+      case 'log_mood': {
+        if (!lifestyleTracker) return 'Yaşam takip modülü hazır değil.'
+        const score = Number(args.score)
+        if (!score || score < 1 || score > 5) return 'Ruh hali puanı 1-5 arası olmalı.'
+        const note = (args.note as string || '').trim() || undefined
+        return lifestyleTracker.logMood(score, note)
+      }
+
+      case 'log_habit': {
+        if (!lifestyleTracker) return 'Yaşam takip modülü hazır değil.'
+        const name = (args.name as string || '').trim()
+        const done = args.done !== false  // default true
+        if (!name) return 'Alışkanlık adı boş.'
+        return lifestyleTracker.logHabit(name, done)
+      }
+
+      case 'tracker_summary': {
+        if (!lifestyleTracker) return 'Yaşam takip modülü hazır değil.'
+        return lifestyleTracker.getSummary()
+      }
+
+      case 'export_conversation': {
+        if (!conversationLog) return 'Sohbet log modülü hazır değil.'
+        const date = (args.date as string || '').trim() || undefined
+        const r = conversationLog.exportToDesktop(date)
+        if (!r.ok) return `Export başarısız: ${r.reason}`
+        return `Sohbet log'u Masaüstüne kaydedildi: ${r.outPath}`
+      }
+
+      case 'what_do_you_know': {
+        if (!memory) return 'Hafıza modülü hazır değil.'
+        const facts = memory.getFacts()
+        const summary = memory.getRecentSummary()
+        const web = memory.getLastWebContext()
+        const lines: string[] = []
+        lines.push(`Senin hakkında bildiklerim (${facts.length} bilgi):`)
+        facts.forEach((f) => lines.push(`- ${f}`))
+        if (summary) {
+          lines.push('')
+          lines.push('Son sohbetlerimizin özeti:')
+          lines.push(summary)
+        }
+        if (web) {
+          const ageMin = Math.round((Date.now() - new Date(web.fetchedAt).getTime()) / 60000)
+          lines.push('')
+          lines.push(`Son web aramam (${ageMin} dk önce): "${web.query}"`)
+        }
+        return lines.join('\n')
       }
 
       case 'daily_briefing': {
