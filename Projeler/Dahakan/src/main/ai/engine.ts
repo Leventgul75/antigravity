@@ -1,6 +1,6 @@
 import Groq from 'groq-sdk'
 import { buildSystemPrompt, TOOL_DEFINITIONS } from './system-prompt'
-import { executeTool, setMemory } from './tools'
+import { executeTool, setMemory, setBriefingProvider } from './tools'
 import { Memory } from './memory'
 import { getEnv } from '../utils/env-loader'
 
@@ -52,6 +52,7 @@ export class AIEngine {
     this.client = new Groq({ apiKey })
     this.memory = new Memory()
     setMemory(this.memory)
+    setBriefingProvider({ generateDailyBriefing: (m, e) => this.generateDailyBriefing(m, e) })
     console.log('[Dahakan AI] Motor başlatıldı, modeller:', MODEL_FALLBACK_CHAIN.join(', '))
   }
 
@@ -241,6 +242,52 @@ Karşılama mesajını sadece çıktı olarak yaz, açıklama yapma:`
     if (timeOfDay === 'akşam') return 'İyi akşamlar. Yorucu bir gün müydü?'
     if (timeOfDay === 'gece') return 'Gece çalışıyoruz demek. Nasıl yardım edebilirim?'
     return 'Buradayım, dinliyorum.'
+  }
+
+  /** Günlük brifing: sabah agenda, akşam özet. Mod yoksa saatten karar verilir. */
+  async generateDailyBriefing(mode: 'sabah' | 'aksam' | 'auto' = 'auto', extraContext: string = ''): Promise<string> {
+    const hour = new Date().getHours()
+    let realMode: 'sabah' | 'aksam' = 'sabah'
+    if (mode === 'auto') {
+      realMode = hour >= 17 ? 'aksam' : 'sabah'
+    } else {
+      realMode = mode
+    }
+    const memoryBlock = this.memory.serializeForPrompt()
+    const recentSummary = this.memory.getRecentSummary()
+
+    const intro = realMode === 'sabah'
+      ? `Şu an sabah/öğle, Levent yeni bir güne başlıyor.`
+      : `Şu an akşam, Levent bir günü kapatıyor.`
+    const focus = realMode === 'sabah'
+      ? `BUGÜN için kısa bir agenda yaz — bildiğin şeyler ışığında 3-5 cümle. Yapacaklarını ve hatırlattıkların varsa onları öne çıkar. Yapmacık olma.`
+      : `BUGÜN ne yapıldığının kısa özetini yaz — sohbet özetinden çıkar. Sonra varsa yarına bakacak bir not düş. 3-5 cümle, doğal konuşma dili.`
+
+    const prompt = `Sen Dahakan'sın. ${intro}
+
+${focus}
+
+${memoryBlock}
+
+${recentSummary ? `SOHBET ÖZETİ:\n${recentSummary}\n` : ''}
+${extraContext ? `EK BAĞLAM:\n${extraContext}\n` : ''}
+
+Markdown KULLANMA, hitap YOK ("efendim/abi/kanka" yasak), düz Türkçe konuşma dili. 3-5 cümle. Sadece brifingi yaz, açıklama yapma.`
+
+    try {
+      const resp = await this.createCompletion({
+        messages: [{ role: 'user', content: prompt }] as any,
+        temperature: 0.6,
+        max_tokens: 400,
+      })
+      const text = resp.choices?.[0]?.message?.content?.trim() || ''
+      return text || (realMode === 'sabah' ? 'Yeni güne hoş geldin. Bugün ne yapalım?' : 'Günü tamamladın. Yarın görüşürüz.')
+    } catch (err) {
+      console.warn('[Dahakan AI] Brifing üretilemedi:', err)
+      return realMode === 'sabah'
+        ? 'Yeni güne hoş geldin. Bugün ne yapalım?'
+        : 'Günü tamamladın. Yarın görüşürüz.'
+    }
   }
 
   /** Rate-limit + tool-format hatalarına dayanıklı tamamlama: cooldown'daki modeli atlar */

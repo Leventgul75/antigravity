@@ -40,6 +40,9 @@ YETENEKLERİN:
 - Bir bilgiyi unutmasını isterse forget_fact aracıyla silebilirsin
 - analyze_screen ile onun ekranına bakıp ne olduğunu söyleyebilirsin
 - start_focus_mode / end_focus_mode ile odaklanma oturumu başlatıp bitirebilirsin
+- save_note ile sesli/yazılı not alıp markdown olarak kaydedebilirsin
+- find_notes ile eski notları arayıp getirebilirsin
+- daily_briefing ile sabah agenda'sı veya akşam özeti hazırlayabilirsin
 
 KURALLAR:
 - Kullanıcı bir uygulama açmak isterse open_application aracını kullan.
@@ -54,6 +57,9 @@ KURALLAR:
 - Tarih veya gün sorusu gelirse aşağıdaki BUGÜN bilgisini kullan — uydurma.
 - "Ekrana bak", "ne yapıyorum", "şuna bir bak" gibi bir şey söylerse analyze_screen aracını çağır.
 - "Bir saat odaklanacağım", "30 dk pomodoro başlat" derse start_focus_mode'u çağır (varsayılan 25 dk).
+- "Şunu not al", "şunu yaz", "hatırla şunu" (geçici bilgi) derse save_note'u çağır. Kalıcı kişisel bilgi içinse remember_fact tercih et.
+- "Önceki notlarımı getir", "X hakkında not var mıydı" derse find_notes'u çağır. Sorgu vermezsen son 5 notu döner.
+- "Günaydın", "bana bugünü anlat", "akşam özeti" derse daily_briefing'i çağır.
 
 FORMAT:
 - Sesli yanıtlarda markdown KULLANMA. Konuşma diliyle cevap ver.
@@ -281,6 +287,61 @@ export const TOOL_DEFINITIONS = [
       parameters: {
         type: 'object',
         properties: {},
+        required: []
+      }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'save_note',
+      description: 'Bir not/fikir/yapılacak iş kaydeder (markdown dosyası olarak). Kullanıcı "şunu not al", "şunu yaz", "şunu bir kenara koy" derse kullan. Kalıcı kişisel bilgi (kim olduğu, neyi sevdiği) için remember_fact tercih et — bu, durumsal/geçici notlar içindir.',
+      parameters: {
+        type: 'object',
+        properties: {
+          content: {
+            type: 'string',
+            description: 'Notun tam içeriği. İlk satır başlık olarak kullanılır.'
+          },
+          tag: {
+            type: 'string',
+            description: 'Opsiyonel etiket/kategori. Örnek: "fikir", "iş", "okuma", "alışveriş".'
+          }
+        },
+        required: ['content']
+      }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'find_notes',
+      description: 'Eski notları arar veya listeler. Sorgu verilirse içerik/başlık eşleşmesi yapar; verilmezse en son 5 not döner.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'Aranacak kelime/konu. Boş bırakırsan son notları getirir.'
+          }
+        },
+        required: []
+      }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'daily_briefing',
+      description: 'Levent\'e zamana göre bir brifing yazar: sabah → bugün için agenda (hatırlatıcılar, son hafıza), akşam → günün özeti. Sadece kullanıcı isterse veya proaktif greeting için kullanılır.',
+      parameters: {
+        type: 'object',
+        properties: {
+          mode: {
+            type: 'string',
+            description: 'Opsiyonel: "sabah" (agenda) veya "akşam" (özet). Belirtilmezse saatten otomatik karar verilir.'
+          }
+        },
         required: []
       }
     }

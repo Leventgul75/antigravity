@@ -175,6 +175,17 @@ function registerGlobalShortcuts(): void {
   } else {
     console.warn('[Dahakan] Ctrl+Shift+V kısayolu kaydedilemedi (başka uygulama tutuyor olabilir)')
   }
+
+  // Ctrl+Shift+M — mikrofonu sustur/aç (continuous mode dinlemesi)
+  const muteReg = globalShortcut.register('Ctrl+Shift+M', () => {
+    if (!mainWindow) return
+    mainWindow.webContents.send('dahakan:mute-hotkey')
+  })
+  if (muteReg) {
+    console.log('[Dahakan] Global kısayol kaydedildi: Ctrl+Shift+M (Mic mute)')
+  } else {
+    console.warn('[Dahakan] Ctrl+Shift+M kısayolu kaydedilemedi')
+  }
 }
 
 // ─── App Lifecycle ───────────────────────────────────

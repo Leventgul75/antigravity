@@ -84,6 +84,9 @@ const VAD_POLL_MS = 80;
 // TTS bittikten sonra mic'in yeniden açılmadan önce beklediği süre. ElevenLabs
 // stereo TTS sonunda tail/echo gelebiliyor; çok kısa açarsak Dahakan kendi sesini yakalıyor.
 const POST_TTS_GRACE_MS = 600;
+// Continuous mode'da bu kadar süre boyunca hiçbir konuşma algılanmazsa Dahakan
+// otomatik uykuya geçer — kendisi VAD'i kıyar, ambient'ı düşürür, sleep modu açar.
+const AUTO_SLEEP_MS = 10 * 60 * 1000; // 10 dakika
 
 /* ── Wake word — devamlı dinlemede sadece adı geçenleri işle ──
    Whisper "Dahakan"ı sık sık "Daha kan", "Da hakan", "Daakan", "Hakan" diye yazar.
@@ -212,6 +215,9 @@ class DahakanApp {
   // Audio playback (robust via Web Audio API)
   private audioCtx: AudioContext | null = null;
   private playbackSource: AudioBufferSourceNode | null = null;
+  // Streaming TTS — gelen audio buffer'larını sırayla çal, üstüste binmesin.
+  private audioQueue: Uint8Array[] = [];
+  private isPlayingAudio = false;
 
   // Ambient drone (sci-fi atmospheric pad)
   private ambientGain: GainNode | null = null;
@@ -235,6 +241,10 @@ class DahakanApp {
   private conversationActiveUntil = 0;
   // Sleep mode — pencere gizli, sadece "uyan" tetikler
   private isAsleep = false;
+  // Continuous mode'da en son ne zaman konuşuldu (auto-sleep için)
+  private lastInteractionAt = 0;
+  // Mic mute toggle — Ctrl+Shift+M ile aç/kapat (sleep'ten farklı, sadece dinlemeyi durdurur)
+  private micMuted = false;
 
   constructor() {
     // 1. Three.js Scene
@@ -410,6 +420,7 @@ class DahakanApp {
     this.setStatus(OrbState.THINKING);
 
     let fullResponse = '';
+    const speaker = this.createStreamingSpeaker();
     try {
       const streamEl = this.chatPanel.startStreaming();
       let firstChunk = true;
@@ -423,25 +434,19 @@ class DahakanApp {
         fullResponse += chunk;
         const amplitude = Math.min(chunk.length / 20, 1.0);
         this.transitions.setVoiceAmplitude(amplitude);
+        // Streaming TTS — cümle dolduğunda anında konuşmaya başlar
+        void speaker.push(chunk);
       });
 
       this.chatPanel.finishStreaming(streamEl);
-
-      // Speak the response via ElevenLabs TTS
-      if (fullResponse.trim().length > 0) {
-        try {
-          await window.dahakan.voice.speak(fullResponse.trim());
-        } catch (ttsErr) {
-          console.error('TTS error:', ttsErr);
-        }
-      }
+      // Kalan kısmı boşalt (cümle bitmemiş olabilir)
+      await speaker.flush();
     } catch (err) {
       console.error('AI stream error:', err);
       this.chatPanel.addMessage('Bağlantı hatası oluştu. Tekrar dene.', 'dahakan');
     }
 
-    this.setStatus(OrbState.IDLE);
-    this.transitions.setVoiceAmplitude(0);
+    // Status playback bittiğinde playNextInQueue() tarafından IDLE/LISTENING'e döner
     this.isProcessing = false;
     this.chatPanel.setInputEnabled(true);
     this.chatPanel.focusInput();
@@ -603,11 +608,12 @@ class DahakanApp {
   private startVadPolling(): void {
     if (!this.continuousAnalyser) return;
     const buf = new Uint8Array(this.continuousAnalyser.fftSize);
+    this.lastInteractionAt = performance.now();
 
     this.continuousPollTimer = setInterval(() => {
       if (!this.continuousActive || !this.continuousAnalyser) return;
-
-      // If we're speaking or processing, suspend VAD detection to avoid feedback
+      // Muted veya speaking/processing sırasında VAD geçici durdur
+      if (this.micMuted) return;
       if (this.isSpeaking || this.isProcessing) return;
 
       this.continuousAnalyser.getByteTimeDomainData(buf);
@@ -628,6 +634,7 @@ class DahakanApp {
           this.vadSpeechStartedAt = now;
         }
         this.vadLastSpeechAt = now;
+        this.lastInteractionAt = now;
       } else if (this.vadIsRecording) {
         const silenceFor = now - this.vadLastSpeechAt;
         const utteranceLen = now - this.vadSpeechStartedAt;
@@ -637,8 +644,33 @@ class DahakanApp {
           // Too short, discard
           this.cancelVadRecording();
         }
+      } else if (!this.isAsleep && (now - this.lastInteractionAt) > AUTO_SLEEP_MS) {
+        // Uzun süre konuşma yok → otomatik uykuya geç (sessizce, TTS olmadan)
+        console.log('[Dahakan VAD] 10 dk inaktivite → otomatik uyku');
+        void this.handleAutoSleep();
       }
     }, VAD_POLL_MS);
+  }
+
+  /** Auto-sleep: kullanıcı uzun süre konuşmadıysa sessizce uyku moduna geç. */
+  private async handleAutoSleep(): Promise<void> {
+    this.isAsleep = true;
+    this.lastInteractionAt = performance.now();
+    this.chatPanel.addMessage('(Bir süre konuşmadın, uykuya geçiyorum. Adımı söylersen uyanırım.)', 'dahakan');
+    window.dahakan.window.hide();
+    this.setStatus(OrbState.IDLE);
+  }
+
+  /** Ctrl+Shift+M ile çağrılır — continuous mode'u sustur/aç (sleep'ten farklı). */
+  private toggleMicMute(): void {
+    this.micMuted = !this.micMuted;
+    if (this.micMuted) {
+      this.cancelVadRecording();
+      this.chatPanel.addMessage('Mikrofon susturuldu. Açmak için yine Ctrl+Shift+M.', 'dahakan');
+    } else {
+      this.lastInteractionAt = performance.now();
+      this.chatPanel.addMessage('Mikrofon tekrar açık.', 'dahakan');
+    }
   }
 
   private startVadRecording(): void {
@@ -840,6 +872,7 @@ class DahakanApp {
     this.setStatus(OrbState.THINKING);
 
     let fullResponse = '';
+    const speaker = this.createStreamingSpeaker();
     try {
       const streamEl = this.chatPanel.startStreaming();
       let firstChunk = true;
@@ -850,114 +883,160 @@ class DahakanApp {
         }
         this.chatPanel.appendToStream(streamEl, chunk);
         fullResponse += chunk;
+        void speaker.push(chunk);
       });
       this.chatPanel.finishStreaming(streamEl);
-
-      if (fullResponse.trim().length > 0) {
-        try {
-          await window.dahakan.voice.speak(fullResponse.trim());
-        } catch (ttsErr) {
-          console.error('TTS error:', ttsErr);
-        }
-      }
+      await speaker.flush();
     } catch (err) {
       console.error('AI stream error:', err);
       this.chatPanel.addMessage('Bağlantı hatası oluştu.', 'dahakan');
     }
 
     this.isProcessing = false;
-    this.transitions.setVoiceAmplitude(0);
-
-    if (this.continuousActive) {
-      this.setStatus(OrbState.LISTENING);
-    } else {
-      this.setStatus(OrbState.IDLE);
-    }
+    // Audio queue bittiğinde playNextInQueue zaten LISTENING/IDLE'e geçecek
   }
 
-  /* ── Audio Playback via Web Audio API (robust, bypasses autoplay) ─── */
+  /* ── Audio Playback via Web Audio API (robust, bypasses autoplay) ───
+     Streaming TTS için kuyruğa alma:
+       1. Gelen her buffer audioQueue'ya eklenir.
+       2. Hiçbir şey çalmıyorsa playNext tetiklenir.
+       3. Çalan kaynak bittiğinde onended ile sıradakine geçer.
+       4. audio-stop gelirse kuyruk boşalır + aktif kaynak durur. */
   private setupAudioPlayback(): void {
-    window.dahakan.on('dahakan:audio-play', async (buffer: Uint8Array) => {
+    window.dahakan.on('dahakan:audio-play', (buffer: Uint8Array) => {
       const byteLen = (buffer as any)?.byteLength ?? (buffer as any)?.length ?? 0;
-      console.log('[Dahakan Renderer] audio-play olayı alındı, boyut:', byteLen);
-
-      try {
-        if (!this.audioCtx) {
-          this.audioCtx = new AudioContext();
-        }
-        if (this.audioCtx.state === 'suspended') {
-          await this.audioCtx.resume();
-        }
-
-        // Stop any currently-playing audio
-        if (this.playbackSource) {
-          try { this.playbackSource.stop(); } catch {}
-          this.playbackSource = null;
-        }
-
-        // Copy into a fresh ArrayBuffer so decodeAudioData can detach it
-        const arrayBuf = new ArrayBuffer(buffer.byteLength);
-        new Uint8Array(arrayBuf).set(buffer);
-
-        const audioBuffer = await this.audioCtx.decodeAudioData(arrayBuf);
-        const source = this.audioCtx.createBufferSource();
-        source.buffer = audioBuffer;
-
-        // Özel ses ID kullanıcı tarafından sağlandı — ham/temiz çal, EQ ve pitch-shift yok
-        source.connect(this.audioCtx.destination);
-
-        this.isSpeaking = true;
-        this.setStatus(OrbState.SPEAKING);
-        this.duckAmbient(true);
-
-        source.onended = () => {
-          console.log('[Dahakan Renderer] Ses çalma tamamlandı');
-          this.isSpeaking = false;
-          this.playbackSource = null;
-          this.transitions.setVoiceAmplitude(0);
-          this.duckAmbient(false);
-          // TTS bittiğinde grace period başlat — wake-word'süz 25 sn diyalog
-          this.conversationActiveUntil = performance.now() + 25_000;
-          if (this.continuousActive) {
-            // Brief delay before re-listening so the tail doesn't get picked up
-            setTimeout(() => {
-              this.vadLastSpeechAt = performance.now();
-              this.setStatus(OrbState.LISTENING);
-            }, POST_TTS_GRACE_MS);
-          } else if (!this.isProcessing) {
-            this.setStatus(OrbState.IDLE);
-          }
-        };
-
-        this.playbackSource = source;
-        source.start(0);
-        console.log('[Dahakan Renderer] Ses çalmaya başladı, süre:', audioBuffer.duration.toFixed(2), 'sn');
-
-        // Animate orb amplitude during speech (synthetic envelope)
-        const startTime = performance.now();
-        const duration = audioBuffer.duration * 1000;
-        const animate = () => {
-          if (!this.isSpeaking) return;
-          const t = (performance.now() - startTime) / duration;
-          if (t >= 1) return;
-          const env = Math.sin(t * Math.PI * 8) * 0.3 + 0.6;
-          this.transitions.setVoiceAmplitude(env);
-          requestAnimationFrame(animate);
-        };
-        requestAnimationFrame(animate);
-      } catch (err) {
-        console.error('[Dahakan Renderer] Ses çalma hatası:', err);
-        this.isSpeaking = false;
+      console.log('[Dahakan Renderer] audio-play geldi, boyut:', byteLen, 'kuyruk:', this.audioQueue.length);
+      this.audioQueue.push(buffer);
+      if (!this.isPlayingAudio) {
+        void this.playNextInQueue();
       }
     });
 
     window.dahakan.on('dahakan:audio-stop', () => {
+      this.audioQueue = [];
       if (this.playbackSource) {
         try { this.playbackSource.stop(); } catch {}
         this.playbackSource = null;
       }
       this.isSpeaking = false;
+      this.isPlayingAudio = false;
     });
+  }
+
+  private async playNextInQueue(): Promise<void> {
+    const buffer = this.audioQueue.shift();
+    if (!buffer) {
+      // Kuyruk bitti → idle/listen state'e dön
+      this.isPlayingAudio = false;
+      this.isSpeaking = false;
+      this.transitions.setVoiceAmplitude(0);
+      this.duckAmbient(false);
+      this.conversationActiveUntil = performance.now() + 25_000;
+      if (this.continuousActive) {
+        setTimeout(() => {
+          this.vadLastSpeechAt = performance.now();
+          this.setStatus(OrbState.LISTENING);
+        }, POST_TTS_GRACE_MS);
+      } else if (!this.isProcessing) {
+        this.setStatus(OrbState.IDLE);
+      }
+      return;
+    }
+    try {
+      if (!this.audioCtx) {
+        this.audioCtx = new AudioContext();
+      }
+      if (this.audioCtx.state === 'suspended') {
+        await this.audioCtx.resume();
+      }
+
+      const arrayBuf = new ArrayBuffer(buffer.byteLength);
+      new Uint8Array(arrayBuf).set(buffer);
+
+      const audioBuffer = await this.audioCtx.decodeAudioData(arrayBuf);
+      const source = this.audioCtx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(this.audioCtx.destination);
+
+      this.isPlayingAudio = true;
+      this.isSpeaking = true;
+      this.setStatus(OrbState.SPEAKING);
+      this.duckAmbient(true);
+
+      source.onended = () => {
+        this.playbackSource = null;
+        // Sıradaki cümle için devam et — ufak bir tampon ile pürüzsüz akış
+        setTimeout(() => void this.playNextInQueue(), 30);
+      };
+
+      this.playbackSource = source;
+      source.start(0);
+      console.log('[Dahakan Renderer] Ses çalıyor, süre:', audioBuffer.duration.toFixed(2), 'sn');
+
+      // Amplitude envelope animasyonu
+      const startTime = performance.now();
+      const duration = audioBuffer.duration * 1000;
+      const animate = () => {
+        if (!this.isSpeaking) return;
+        const t = (performance.now() - startTime) / duration;
+        if (t >= 1) return;
+        const env = Math.sin(t * Math.PI * 8) * 0.3 + 0.6;
+        this.transitions.setVoiceAmplitude(env);
+        requestAnimationFrame(animate);
+      };
+      requestAnimationFrame(animate);
+    } catch (err) {
+      console.error('[Dahakan Renderer] Ses çalma hatası:', err);
+      // Hatada da sıradakini dene; sonsuza dek takılma
+      setTimeout(() => void this.playNextInQueue(), 30);
+    }
+  }
+
+  /** LLM cevabı stream gelirken cümle cümle TTS'e gönder.
+   *  Cümle bitiş işaretleri: `.`, `?`, `!`. Henüz tamamlanmamış kuyruğu close()'da boşalt. */
+  private createStreamingSpeaker() {
+    let buffer = '';
+    let firstSent = false;
+    const trySend = async (force: boolean) => {
+      // Cümle parçalayıcı: noktalama + boşluk ya da satır sonu
+      while (true) {
+        const m = buffer.match(/[^.!?]+[.!?]+["')\]]*\s*/);
+        if (!m) break;
+        const sentence = m[0].trim();
+        buffer = buffer.slice(m[0].length);
+        if (sentence.length > 0) {
+          try {
+            await window.dahakan.voice.speak(sentence);
+            firstSent = true;
+          } catch (err) {
+            console.warn('[Dahakan Streaming TTS] speak hatası:', err);
+          }
+        }
+      }
+      if (force && buffer.trim().length > 0) {
+        const rest = buffer.trim();
+        buffer = '';
+        try {
+          await window.dahakan.voice.speak(rest);
+          firstSent = true;
+        } catch (err) {
+          console.warn('[Dahakan Streaming TTS] kuyruk boşaltma hatası:', err);
+        }
+      }
+    };
+    return {
+      push: async (chunk: string) => {
+        buffer += chunk;
+        // Cümle tamamlanmış mı kontrol et; varsa hemen yolla
+        if (/[.!?]/.test(chunk)) {
+          await trySend(false);
+        }
+      },
+      flush: async () => {
+        await trySend(true);
+        return firstSent;
+      },
+    };
   }
 
   /* ── Window Controls ──────────────────────────────────────── */
@@ -1073,6 +1152,9 @@ class DahakanApp {
     });
     window.dahakan.on('dahakan:vision-hotkey', () => {
       void this.triggerVision();
+    });
+    window.dahakan.on('dahakan:mute-hotkey', () => {
+      this.toggleMicMute();
     });
   }
 

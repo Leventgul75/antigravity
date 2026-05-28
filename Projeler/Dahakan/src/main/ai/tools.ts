@@ -3,11 +3,26 @@ import { getSystemInfo, formatSystemInfoForAI } from '../system/monitor'
 import { searchFile } from '../system/file-manager'
 import { searchWeb } from '../features/web-search'
 import { analyzeScreen } from '../features/vision'
+import { saveNote, listNotes, findNotes, formatNotesForAI } from '../features/notes'
 import type { Memory } from './memory'
 import type { FocusMode } from '../features/focus-mode'
 
 // ReminderManager is injected via setReminderManager since it requires a callback
-let reminderManager: { addReminder: (minutes: number, message: string) => string } | null = null
+interface ReminderHandle {
+  addReminder: (minutes: number, message: string) => string
+  getActiveReminders?: () => Array<{ id: string; message: string; remainingMinutes: number }>
+}
+let reminderManager: ReminderHandle | null = null
+
+// Engine injected by engine setup — daily_briefing buradan çağırır
+interface BriefingHandle {
+  generateDailyBriefing: (mode: 'sabah' | 'aksam' | 'auto', extraContext?: string) => Promise<string>
+}
+let briefingProvider: BriefingHandle | null = null
+
+export function setBriefingProvider(p: BriefingHandle): void {
+  briefingProvider = p
+}
 
 // Memory injected by engine — remember_fact / forget_fact buradan yazar
 let memory: Memory | null = null
@@ -15,7 +30,7 @@ let memory: Memory | null = null
 // Odaklanma modu — start/end_focus_mode buradan kontrol eder
 let focusMode: FocusMode | null = null
 
-export function setReminderManager(manager: { addReminder: (minutes: number, message: string) => string }): void {
+export function setReminderManager(manager: ReminderHandle): void {
   reminderManager = manager
 }
 
@@ -120,6 +135,44 @@ export async function executeTool(name: string, args: Record<string, any>): Prom
         if (!focusMode) return 'Odaklanma modu hazır değil.'
         const wasActive = focusMode.stop()
         return wasActive ? 'Odak modu erken bitirildi.' : 'Zaten odaklanma modunda değildin.'
+      }
+
+      case 'save_note': {
+        const content = (args.content as string || '').trim()
+        if (!content) return 'Not içeriği boş.'
+        const tag = (args.tag as string || '').trim() || undefined
+        return saveNote(content, tag)
+      }
+
+      case 'find_notes': {
+        const query = (args.query as string || '').trim()
+        if (!query) {
+          const recent = listNotes(5)
+          return recent.length === 0
+            ? 'Henüz hiç not yok.'
+            : `En son 5 not:\n\n${formatNotesForAI(recent)}`
+        }
+        const matches = findNotes(query, 5)
+        return matches.length === 0
+          ? `"${query}" ile ilgili not bulamadım.`
+          : `"${query}" için ${matches.length} not bulundu:\n\n${formatNotesForAI(matches)}`
+      }
+
+      case 'daily_briefing': {
+        if (!briefingProvider) return 'Brifing motoru hazır değil.'
+        const rawMode = (args.mode as string || '').toLowerCase().trim()
+        let mode: 'sabah' | 'aksam' | 'auto' = 'auto'
+        if (rawMode === 'sabah' || rawMode === 'morning' || rawMode === 'agenda') mode = 'sabah'
+        else if (rawMode === 'akşam' || rawMode === 'aksam' || rawMode === 'evening' || rawMode === 'özet' || rawMode === 'ozet') mode = 'aksam'
+        // Aktif hatırlatıcıları ek bağlam olarak ver
+        let extra = ''
+        if (reminderManager?.getActiveReminders) {
+          const active = reminderManager.getActiveReminders()
+          if (active.length > 0) {
+            extra = 'AKTİF HATIRLATICILAR:\n' + active.map((r) => `- ${r.remainingMinutes} dk içinde: ${r.message}`).join('\n')
+          }
+        }
+        return await briefingProvider.generateDailyBriefing(mode, extra)
       }
 
       default:

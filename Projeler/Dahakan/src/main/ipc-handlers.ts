@@ -22,8 +22,18 @@ export function setupIpcHandlers(mainWindow: BrowserWindow): void {
   const audioCapture = new AudioCapture()
 
   const reminderManager = new ReminderManager((message: string) => {
-    // Send reminder notification to renderer
+    // Renderer'a bildir — chat'te göstersin
     mainWindow.webContents.send('dahakan:reminder-triggered', message)
+    // Dahakan sesli olarak söylesin — Notification yetmez, arkadaş gibi konuş
+    void (async () => {
+      try {
+        const spoken = `Hatırlatma: ${message}`
+        const audioBuffer = await tts.synthesize(spoken)
+        mainWindow.webContents.send('dahakan:audio-play', audioBuffer)
+      } catch (err) {
+        console.warn('[Dahakan Reminder] Sesli okuma başarısız:', err)
+      }
+    })()
   })
 
   const focusMode = new FocusMode((active: boolean, task: string) => {
