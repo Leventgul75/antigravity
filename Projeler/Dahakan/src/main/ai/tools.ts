@@ -4,6 +4,7 @@ import { searchFile } from '../system/file-manager'
 import { searchWeb } from '../features/web-search'
 import { analyzeScreen } from '../features/vision'
 import { saveNote, listNotes, findNotes, formatNotesForAI } from '../features/notes'
+import { readClipboard, writeClipboard, getActiveWindow, formatActiveWindowForAI } from '../features/context'
 import type { Memory } from './memory'
 import type { FocusMode } from '../features/focus-mode'
 
@@ -72,7 +73,12 @@ export async function executeTool(name: string, args: Record<string, any>): Prom
       case 'search_web': {
         const query = args.query as string
         if (!query) return 'Arama sorgusu belirtilmedi.'
-        return await searchWeb(query)
+        const result = await searchWeb(query)
+        // Cevabı memory'ye kaydet ki kullanıcının takip soruları context'e otomatik gelsin
+        if (memory && result && !result.startsWith('Web araması başarısız')) {
+          memory.setLastWebContext(query, result)
+        }
+        return result
       }
 
       case 'set_reminder': {
@@ -156,6 +162,24 @@ export async function executeTool(name: string, args: Record<string, any>): Prom
         return matches.length === 0
           ? `"${query}" ile ilgili not bulamadım.`
           : `"${query}" için ${matches.length} not bulundu:\n\n${formatNotesForAI(matches)}`
+      }
+
+      case 'read_clipboard': {
+        const text = readClipboard()
+        if (!text) return 'Pano boş veya okunamadı.'
+        return `Pano içeriği (${text.length} karakter):\n\n${text}`
+      }
+
+      case 'write_clipboard': {
+        const text = (args.text as string || '')
+        if (!text) return 'Yazılacak metin boş.'
+        const ok = writeClipboard(text)
+        return ok ? 'Pano güncellendi.' : 'Pano güncellenemedi.'
+      }
+
+      case 'get_active_window': {
+        const info = await getActiveWindow()
+        return formatActiveWindowForAI(info)
       }
 
       case 'daily_briefing': {

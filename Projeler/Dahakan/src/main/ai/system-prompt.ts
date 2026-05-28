@@ -43,6 +43,9 @@ YETENEKLERİN:
 - save_note ile sesli/yazılı not alıp markdown olarak kaydedebilirsin
 - find_notes ile eski notları arayıp getirebilirsin
 - daily_briefing ile sabah agenda'sı veya akşam özeti hazırlayabilirsin
+- read_clipboard ile Levent'in panosundaki metni okuyup üzerinde işlem yapabilirsin
+- write_clipboard ile cevabını veya bir metni panoya kopyalayabilirsin
+- get_active_window ile şu an hangi uygulamanın odakta olduğunu görebilirsin
 
 KURALLAR:
 - Kullanıcı bir uygulama açmak isterse open_application aracını kullan.
@@ -60,6 +63,9 @@ KURALLAR:
 - "Şunu not al", "şunu yaz", "hatırla şunu" (geçici bilgi) derse save_note'u çağır. Kalıcı kişisel bilgi içinse remember_fact tercih et.
 - "Önceki notlarımı getir", "X hakkında not var mıydı" derse find_notes'u çağır. Sorgu vermezsen son 5 notu döner.
 - "Günaydın", "bana bugünü anlat", "akşam özeti" derse daily_briefing'i çağır.
+- "Panomdakini özetle/çevir/açıkla", "kopyaladığım metin" derse önce read_clipboard çağır, sonra istediği işlemi yap.
+- "Şunu panoya kopyala", "şunu pano yap" derse write_clipboard çağır.
+- "Hangi uygulamadayım", "ne yapıyorum şu an" derse get_active_window'u çağır.
 
 FORMAT:
 - Sesli yanıtlarda markdown KULLANMA. Konuşma diliyle cevap ver.
@@ -327,6 +333,36 @@ export const TOOL_DEFINITIONS = [
         },
         required: []
       }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'read_clipboard',
+      description: 'Levent\'in panosundaki metni okur. "Panomdakini özetle/çevir/açıkla", "şu kopyaladığım", "panodaki ne diyor" gibi şeyler söylerse önce bunu çağır, sonra istediği işlemi yap.',
+      parameters: { type: 'object', properties: {}, required: [] }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'write_clipboard',
+      description: 'Verilen metni Levent\'in panosuna kopyalar. "Şunu panoya kopyala", "şunu pano yap" derse kullan.',
+      parameters: {
+        type: 'object',
+        properties: {
+          text: { type: 'string', description: 'Panoya yazılacak metin.' }
+        },
+        required: ['text']
+      }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'get_active_window',
+      description: 'Şu an hangi uygulamanın açık ve odakta olduğunu öğrenir. "Ne yapıyorum şu an", "hangi pencereyim", "üzerinde çalıştığım dosya ne" gibi sorularda kullan.',
+      parameters: { type: 'object', properties: {}, required: [] }
     }
   },
   {

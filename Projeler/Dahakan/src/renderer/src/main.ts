@@ -218,6 +218,9 @@ class DahakanApp {
   // Streaming TTS — gelen audio buffer'larını sırayla çal, üstüste binmesin.
   private audioQueue: Uint8Array[] = [];
   private isPlayingAudio = false;
+  // Henüz ses olarak gelmemiş, ElevenLabs'a gitmiş ama buffer dönmemiş istek sayısı.
+  // VAD bu sıfırdan büyük olduğu sürece de "isSpeaking" gibi davranır → kendi sesini kaydetmez.
+  private pendingTtsRequests = 0;
 
   // Ambient drone (sci-fi atmospheric pad)
   private ambientGain: GainNode | null = null;
@@ -614,7 +617,10 @@ class DahakanApp {
       if (!this.continuousActive || !this.continuousAnalyser) return;
       // Muted veya speaking/processing sırasında VAD geçici durdur
       if (this.micMuted) return;
+      // Streaming TTS sırasında: aktif ses çalıyor, kuyrukta bekleyen var veya
+      // hala beklenen bir TTS network isteği var — hepsinde mic'i kaydetme
       if (this.isSpeaking || this.isProcessing) return;
+      if (this.audioQueue.length > 0 || this.pendingTtsRequests > 0) return;
 
       this.continuousAnalyser.getByteTimeDomainData(buf);
       let sumSq = 0;
@@ -926,7 +932,11 @@ class DahakanApp {
   private async playNextInQueue(): Promise<void> {
     const buffer = this.audioQueue.shift();
     if (!buffer) {
-      // Kuyruk bitti → idle/listen state'e dön
+      // Henüz beklenen TTS isteği varsa kapanma — bir sonraki audio-play eventinde tekrar bu fn devreye girer
+      if (this.pendingTtsRequests > 0) {
+        return;
+      }
+      // Kuyruk gerçekten bitti → idle/listen state'e dön
       this.isPlayingAudio = false;
       this.isSpeaking = false;
       this.transitions.setVoiceAmplitude(0);
@@ -993,41 +1003,41 @@ class DahakanApp {
   }
 
   /** LLM cevabı stream gelirken cümle cümle TTS'e gönder.
-   *  Cümle bitiş işaretleri: `.`, `?`, `!`. Henüz tamamlanmamış kuyruğu close()'da boşalt. */
+   *  Cümle bitiş işaretleri: `.`, `?`, `!`. Henüz tamamlanmamış kuyruğu close()'da boşalt.
+   *  pendingTtsRequests counter'ı ile VAD'in kendi sesini yakalaması engellenir. */
   private createStreamingSpeaker() {
     let buffer = '';
     let firstSent = false;
+    const speakSentence = async (text: string) => {
+      this.pendingTtsRequests++;
+      try {
+        await window.dahakan.voice.speak(text);
+        firstSent = true;
+      } catch (err) {
+        console.warn('[Dahakan Streaming TTS] speak hatası:', err);
+      } finally {
+        this.pendingTtsRequests--;
+      }
+    };
     const trySend = async (force: boolean) => {
-      // Cümle parçalayıcı: noktalama + boşluk ya da satır sonu
       while (true) {
         const m = buffer.match(/[^.!?]+[.!?]+["')\]]*\s*/);
         if (!m) break;
         const sentence = m[0].trim();
         buffer = buffer.slice(m[0].length);
         if (sentence.length > 0) {
-          try {
-            await window.dahakan.voice.speak(sentence);
-            firstSent = true;
-          } catch (err) {
-            console.warn('[Dahakan Streaming TTS] speak hatası:', err);
-          }
+          await speakSentence(sentence);
         }
       }
       if (force && buffer.trim().length > 0) {
         const rest = buffer.trim();
         buffer = '';
-        try {
-          await window.dahakan.voice.speak(rest);
-          firstSent = true;
-        } catch (err) {
-          console.warn('[Dahakan Streaming TTS] kuyruk boşaltma hatası:', err);
-        }
+        await speakSentence(rest);
       }
     };
     return {
       push: async (chunk: string) => {
         buffer += chunk;
-        // Cümle tamamlanmış mı kontrol et; varsa hemen yolla
         if (/[.!?]/.test(chunk)) {
           await trySend(false);
         }

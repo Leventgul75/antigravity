@@ -2,6 +2,7 @@ import Groq from 'groq-sdk'
 import { buildSystemPrompt, TOOL_DEFINITIONS } from './system-prompt'
 import { executeTool, setMemory, setBriefingProvider } from './tools'
 import { Memory } from './memory'
+import { ConversationLog } from '../features/conversation-log'
 import { getEnv } from '../utils/env-loader'
 
 interface ChatMessage {
@@ -46,11 +47,14 @@ export class AIEngine {
   private modelCooldownUntil: Map<string, number> = new Map()
   // Kalıcı hafıza — disk'te JSON, system prompt'a her turda inject edilir
   private memory: Memory
+  // Günlük markdown log — her tur sonunda yazılır
+  private log: ConversationLog
 
   constructor() {
     const apiKey = getEnv('GROQ_API_KEY')
     this.client = new Groq({ apiKey })
     this.memory = new Memory()
+    this.log = new ConversationLog()
     setMemory(this.memory)
     setBriefingProvider({ generateDailyBriefing: (m, e) => this.generateDailyBriefing(m, e) })
     console.log('[Dahakan AI] Motor başlatıldı, modeller:', MODEL_FALLBACK_CHAIN.join(', '))
@@ -332,6 +336,8 @@ Markdown KULLANMA, hitap YOK ("efendim/abi/kanka" yasak), düz Türkçe konuşma
         this.conversationHistory.push({ role: 'user', content: message })
         this.conversationHistory.push({ role: 'assistant', content: geminiAnswer })
         this.trimHistory()
+        this.log.appendTurn('levent', message)
+        this.log.appendTurn('dahakan', geminiAnswer)
         this.maybeSummarizeAsync()
         return geminiAnswer
       }
@@ -340,6 +346,7 @@ Markdown KULLANMA, hitap YOK ("efendim/abi/kanka" yasak), düz Türkçe konuşma
 
     this.conversationHistory.push({ role: 'user', content: message })
     this.trimHistory()
+    this.log.appendTurn('levent', message)
 
     try {
       let rounds = 0
@@ -396,6 +403,7 @@ Markdown KULLANMA, hitap YOK ("efendim/abi/kanka" yasak), düz Türkçe konuşma
         const responseText = assistantMessage.content || ''
         this.conversationHistory.push({ role: 'assistant', content: responseText })
         this.trimHistory()
+        this.log.appendTurn('dahakan', responseText)
         this.maybeSummarizeAsync()
         return responseText
       }
@@ -444,6 +452,8 @@ Markdown KULLANMA, hitap YOK ("efendim/abi/kanka" yasak), düz Türkçe konuşma
         this.conversationHistory.push({ role: 'user', content: message })
         this.conversationHistory.push({ role: 'assistant', content: geminiAnswer })
         this.trimHistory()
+        this.log.appendTurn('levent', message)
+        this.log.appendTurn('dahakan', geminiAnswer)
         this.maybeSummarizeAsync()
         // Cevabı kelime kelime stream et — renderer'da progressively görünsün
         const words = geminiAnswer.split(/(\s+)/)
@@ -457,6 +467,7 @@ Markdown KULLANMA, hitap YOK ("efendim/abi/kanka" yasak), düz Türkçe konuşma
 
     this.conversationHistory.push({ role: 'user', content: message })
     this.trimHistory()
+    this.log.appendTurn('levent', message)
 
     try {
       let rounds = 0
@@ -530,6 +541,7 @@ Markdown KULLANMA, hitap YOK ("efendim/abi/kanka" yasak), düz Türkçe konuşma
 
         this.conversationHistory.push({ role: 'assistant', content: fullResponse })
         this.trimHistory()
+        this.log.appendTurn('dahakan', fullResponse)
         this.maybeSummarizeAsync()
         return fullResponse
       }

@@ -2,11 +2,18 @@ import { app } from 'electron'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { join } from 'path'
 
+interface LastWebContext {
+  query: string
+  answer: string
+  fetchedAt: string
+}
+
 interface MemorySnapshot {
   userFacts: string[]
   recentSummary: string
   lastUpdated: string
   version: number
+  lastWebContext?: LastWebContext
 }
 
 const SEED_FACTS = [
@@ -101,6 +108,20 @@ export class Memory {
     this.persist(this.snapshot)
   }
 
+  setLastWebContext(query: string, answer: string): void {
+    this.snapshot.lastWebContext = {
+      query: query.trim(),
+      answer: answer.trim(),
+      fetchedAt: new Date().toISOString(),
+    }
+    this.snapshot.lastUpdated = new Date().toISOString()
+    this.persist(this.snapshot)
+  }
+
+  getLastWebContext(): LastWebContext | undefined {
+    return this.snapshot.lastWebContext
+  }
+
   getFacts(): string[] {
     return [...this.snapshot.userFacts]
   }
@@ -120,6 +141,16 @@ export class Memory {
       parts.push('')
       parts.push('SON KONUŞMALARIN ÖZETİ:')
       parts.push(this.snapshot.recentSummary)
+    }
+    // Son web arama bağlamı — sadece son 15 dakika içindeyse anlamlı
+    if (this.snapshot.lastWebContext) {
+      const ageMs = Date.now() - new Date(this.snapshot.lastWebContext.fetchedAt).getTime()
+      if (ageMs < 15 * 60 * 1000) {
+        parts.push('')
+        parts.push('SON WEB ARAMASI (takip sorularında bunu kullan):')
+        parts.push(`Soru: ${this.snapshot.lastWebContext.query}`)
+        parts.push(`Sonuç:\n${this.snapshot.lastWebContext.answer.slice(0, 1500)}`)
+      }
     }
     return parts.join('\n')
   }
