@@ -2,7 +2,9 @@ import { openApplication, openUrl, runCommand } from '../system/commander'
 import { getSystemInfo, formatSystemInfoForAI } from '../system/monitor'
 import { searchFile } from '../system/file-manager'
 import { searchWeb } from '../features/web-search'
+import { analyzeScreen } from '../features/vision'
 import type { Memory } from './memory'
+import type { FocusMode } from '../features/focus-mode'
 
 // ReminderManager is injected via setReminderManager since it requires a callback
 let reminderManager: { addReminder: (minutes: number, message: string) => string } | null = null
@@ -10,12 +12,19 @@ let reminderManager: { addReminder: (minutes: number, message: string) => string
 // Memory injected by engine — remember_fact / forget_fact buradan yazar
 let memory: Memory | null = null
 
+// Odaklanma modu — start/end_focus_mode buradan kontrol eder
+let focusMode: FocusMode | null = null
+
 export function setReminderManager(manager: { addReminder: (minutes: number, message: string) => string }): void {
   reminderManager = manager
 }
 
 export function setMemory(m: Memory): void {
   memory = m
+}
+
+export function setFocusMode(f: FocusMode): void {
+  focusMode = f
 }
 
 export async function executeTool(name: string, args: Record<string, any>): Promise<string> {
@@ -91,6 +100,26 @@ export async function executeTool(name: string, args: Record<string, any>): Prom
         return removed > 0
           ? `Tamam, "${needle}" ile ilgili ${removed} bilgiyi sildim.`
           : `"${needle}" ile eşleşen bir bilgi bulamadım.`
+      }
+
+      case 'analyze_screen': {
+        const question = (args.question as string || '').trim()
+        const result = await analyzeScreen(question || undefined)
+        return result
+      }
+
+      case 'start_focus_mode': {
+        if (!focusMode) return 'Odaklanma modu hazır değil.'
+        const minutes = Number(args.minutes) || 25
+        const task = (args.task as string || '').trim() || 'odaklanma'
+        focusMode.start(minutes, task)
+        return `Odak modu başladı: ${minutes} dakika "${task}". Bittiğinde haber veririm.`
+      }
+
+      case 'end_focus_mode': {
+        if (!focusMode) return 'Odaklanma modu hazır değil.'
+        const wasActive = focusMode.stop()
+        return wasActive ? 'Odak modu erken bitirildi.' : 'Zaten odaklanma modunda değildin.'
       }
 
       default:

@@ -23,6 +23,7 @@ interface DahakanAPI {
     ask: (message: string) => Promise<string>;
     askStream: (message: string, onChunk: (chunk: string) => void) => Promise<void>;
     clearHistory: () => Promise<void>;
+    greeting: () => Promise<string>;
   };
   voice: {
     startListening: () => Promise<void>;
@@ -40,6 +41,10 @@ interface DahakanAPI {
   features: {
     setReminder: (minutes: number, message: string) => Promise<void>;
     searchWeb: (query: string) => Promise<string>;
+    analyzeScreen: (question?: string) => Promise<string>;
+    focusStart: (minutes: number, task: string) => Promise<boolean>;
+    focusStop: () => Promise<boolean>;
+    focusStatus: () => Promise<{ active: boolean; task?: string; remainingMin?: number }>;
   };
   window: {
     minimize: () => void;
@@ -264,6 +269,7 @@ class DahakanApp {
     this.setupAudioPlayback();
     this.setupAudioUnlock();
     this.setupWindowControls();
+    this.setupFocusListener();
     this.startSystemInfoPolling();
     this.showWelcomeMessage();
     this.setStatus(OrbState.IDLE);
@@ -1004,9 +1010,70 @@ class DahakanApp {
 
   /* ── Welcome Message ──────────────────────────────────────── */
   private showWelcomeMessage(): void {
-    setTimeout(() => {
-      this.chatPanel.addMessage('Ben Dahakan. Emrine hazırım.', 'dahakan');
-    }, 500);
+    // Proaktif, zaman + memory bazlı karşılama. Eğer AI uzarsa fallback'le hızlı selam ver.
+    let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+    let alreadyShown = false;
+
+    fallbackTimer = setTimeout(() => {
+      if (!alreadyShown) {
+        alreadyShown = true;
+        this.chatPanel.addMessage('Buradayım. Konuşalım mı?', 'dahakan');
+      }
+    }, 2500);
+
+    void window.dahakan.ai.greeting().then(async (greeting) => {
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      if (alreadyShown) return;
+      alreadyShown = true;
+      const text = (greeting || 'Buradayım, dinliyorum.').trim();
+      this.chatPanel.addMessage(text, 'dahakan');
+      try {
+        await window.dahakan.voice.speak(text);
+      } catch (err) {
+        console.warn('[Dahakan] Karşılama sesi çalınamadı:', err);
+      }
+    }).catch((err) => {
+      console.warn('[Dahakan] Karşılama isteği başarısız:', err);
+    });
+  }
+
+  /** Ctrl+Shift+V — main process global hotkey -> 'dahakan:vision-hotkey' eventi
+   *  veya kullanıcı sağdaki kameraya tıklarsa. Renderer tarafı tetiklenebilir. */
+  private async triggerVision(question?: string): Promise<void> {
+    if (this.isProcessing) return;
+    this.isProcessing = true;
+    this.setStatus(OrbState.THINKING);
+    const placeholder = question ? `[Ekrana bak: ${question}]` : '[Ekrana bak]';
+    this.chatPanel.addMessage(placeholder, 'user');
+    try {
+      const result = await window.dahakan.features.analyzeScreen(question);
+      this.chatPanel.addMessage(result, 'dahakan');
+      try {
+        await window.dahakan.voice.speak(result);
+      } catch (err) {
+        console.warn('[Dahakan Vision] TTS hatası:', err);
+      }
+    } catch (err) {
+      console.error('[Dahakan Vision] Hata:', err);
+      this.chatPanel.addMessage('Ekranı analiz ederken bir aksilik oldu.', 'dahakan');
+    }
+    this.isProcessing = false;
+    this.setStatus(this.continuousActive ? OrbState.LISTENING : OrbState.IDLE);
+  }
+
+  /** Focus mode IPC eventlerini dinle, statüyü UI'a yansıt */
+  private setupFocusListener(): void {
+    window.dahakan.on('dahakan:focus-changed', (payload: { active: boolean; task: string }) => {
+      if (payload.active) {
+        this.chatPanel.addMessage(`Odak modu açık: "${payload.task}". Süre dolunca haber veririm.`, 'dahakan');
+        this.statusIndicator.style.color = 'var(--accent-gold)';
+      } else {
+        this.chatPanel.addMessage('Odak modu bitti. Mola zamanı.', 'dahakan');
+      }
+    });
+    window.dahakan.on('dahakan:vision-hotkey', () => {
+      void this.triggerVision();
+    });
   }
 
   /* ── Cleanup ──────────────────────────────────────────────── */

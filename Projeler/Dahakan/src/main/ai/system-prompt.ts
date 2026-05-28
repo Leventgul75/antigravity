@@ -38,6 +38,8 @@ YETENEKLERİN:
 - Sistem bilgisi (CPU, RAM, disk) alabilirsin
 - Levent'in sana söylediği önemli bilgileri remember_fact aracıyla kaydedebilirsin
 - Bir bilgiyi unutmasını isterse forget_fact aracıyla silebilirsin
+- analyze_screen ile onun ekranına bakıp ne olduğunu söyleyebilirsin
+- start_focus_mode / end_focus_mode ile odaklanma oturumu başlatıp bitirebilirsin
 
 KURALLAR:
 - Kullanıcı bir uygulama açmak isterse open_application aracını kullan.
@@ -50,6 +52,8 @@ KURALLAR:
 - Levent "şunu hatırla", "şunu aklında tut", "ben şöyleyim" gibi bir şey söylerse remember_fact aracını çağır.
 - "Şunu unut", "artık öyle değil" derse forget_fact aracını çağır.
 - Tarih veya gün sorusu gelirse aşağıdaki BUGÜN bilgisini kullan — uydurma.
+- "Ekrana bak", "ne yapıyorum", "şuna bir bak" gibi bir şey söylerse analyze_screen aracını çağır.
+- "Bir saat odaklanacağım", "30 dk pomodoro başlat" derse start_focus_mode'u çağır (varsayılan 25 dk).
 
 FORMAT:
 - Sesli yanıtlarda markdown KULLANMA. Konuşma diliyle cevap ver.
@@ -228,6 +232,56 @@ export const TOOL_DEFINITIONS = [
           }
         },
         required: ['needle']
+      }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'analyze_screen',
+      description: 'Levent\'in bilgisayar ekranının görüntüsünü alır ve Gemini Vision ile inceler. Kullanıcı "ekrana bak", "ne yapıyorum", "şuna bakar mısın", "bu hata ne", "burada ne yazıyor" gibi şeyler söylediğinde kullan. Soru/odak verirsen daha iyi cevap olur.',
+      parameters: {
+        type: 'object',
+        properties: {
+          question: {
+            type: 'string',
+            description: 'Opsiyonel: ekranla ilgili spesifik soru. Örnek: "Bu hata mesajı ne demek?", "Hangi sekmeler açık?", "Kod nerede hata veriyor?". Boş bırakırsan genel açıklama yapar.'
+          }
+        },
+        required: []
+      }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'start_focus_mode',
+      description: 'Odaklanma (pomodoro) oturumu başlatır. Süre bitince bildirim gelir. Kullanıcı "X dakika odaklanacağım", "pomodoro başlat", "konsantre olmak istiyorum" derse kullan.',
+      parameters: {
+        type: 'object',
+        properties: {
+          minutes: {
+            type: 'number',
+            description: 'Odaklanma süresi (dakika). Belirtilmezse 25 kullan.'
+          },
+          task: {
+            type: 'string',
+            description: 'Ne üzerinde çalışılacak. Örnek: "Dahakan kodu", "rapor yazımı", "okuma". Belirtilmezse "odaklanma" kullan.'
+          }
+        },
+        required: []
+      }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'end_focus_mode',
+      description: 'Aktif odaklanma oturumunu erken bitirir. Kullanıcı "odağı bitir", "mola vereyim", "pomodoro\'yu durdur" derse kullan.',
+      parameters: {
+        type: 'object',
+        properties: {},
+        required: []
       }
     }
   }
