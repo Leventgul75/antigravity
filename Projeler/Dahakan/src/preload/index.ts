@@ -6,6 +6,7 @@ export interface DahakanAPI {
     askStream: (message: string, onChunk: (chunk: string) => void) => Promise<void>
     clearHistory: () => Promise<void>
     greeting: () => Promise<string>
+    macroMatch: (message: string) => Promise<string[] | null>
   }
   voice: {
     startListening: () => Promise<void>
@@ -54,7 +55,8 @@ const api: DahakanAPI = {
       ipcRenderer.removeListener(`dahakan:stream:${id}`, handler)
     },
     clearHistory: () => ipcRenderer.invoke('dahakan:clear-history'),
-    greeting: () => ipcRenderer.invoke('dahakan:greeting')
+    greeting: () => ipcRenderer.invoke('dahakan:greeting'),
+    macroMatch: (message: string) => ipcRenderer.invoke('dahakan:macro-match', message)
   },
   voice: {
     startListening: () => ipcRenderer.invoke('dahakan:listen-start'),

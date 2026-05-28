@@ -1,8 +1,9 @@
 import Groq from 'groq-sdk'
 import { buildSystemPrompt, TOOL_DEFINITIONS } from './system-prompt'
-import { executeTool, setMemory, setBriefingProvider } from './tools'
+import { executeTool, setMemory, setBriefingProvider, setMacroStore } from './tools'
 import { Memory } from './memory'
 import { ConversationLog } from '../features/conversation-log'
+import { MacroStoreFile } from '../features/macros'
 import { getEnv } from '../utils/env-loader'
 
 interface ChatMessage {
@@ -49,15 +50,27 @@ export class AIEngine {
   private memory: Memory
   // Günlük markdown log — her tur sonunda yazılır
   private log: ConversationLog
+  // Komut makroları — Levent önceden tanımlar, sesli tetikler
+  private macros: MacroStoreFile
 
   constructor() {
     const apiKey = getEnv('GROQ_API_KEY')
     this.client = new Groq({ apiKey })
     this.memory = new Memory()
     this.log = new ConversationLog()
+    this.macros = new MacroStoreFile()
     setMemory(this.memory)
+    setMacroStore(this.macros)
     setBriefingProvider({ generateDailyBriefing: (m, e) => this.generateDailyBriefing(m, e) })
     console.log('[Dahakan AI] Motor başlatıldı, modeller:', MODEL_FALLBACK_CHAIN.join(', '))
+  }
+
+  /** Bir mesajın tanımlı bir makroyu tetikleyip tetiklemediğini kontrol et. */
+  findMatchingMacroSteps(message: string): string[] | null {
+    const match = this.macros.findMatching(message)
+    if (!match) return null
+    console.log(`[Dahakan AI] Makro eşleşti: "${match.name}"`)
+    return match.steps
   }
 
   /** Şu an kullanılabilir ilk modeli döndürür */

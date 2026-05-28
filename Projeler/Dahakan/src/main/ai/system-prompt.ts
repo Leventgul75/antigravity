@@ -46,6 +46,11 @@ YETENEKLERİN:
 - read_clipboard ile Levent'in panosundaki metni okuyup üzerinde işlem yapabilirsin
 - write_clipboard ile cevabını veya bir metni panoya kopyalayabilirsin
 - get_active_window ile şu an hangi uygulamanın odakta olduğunu görebilirsin
+- translate_text ile bir metni başka dile çevirebilirsin
+- analyze_code ile bir kod parçasını açıklayabilir/düzeltebilir/optimize edebilirsin
+- read_text_file ile Masaüstü/Belgeler/İndirilenler içindeki metin dosyalarını okuyabilirsin
+- list_directory ile bir klasörün içindeki dosyaları listeleyebilirsin
+- list_macros ile Levent'in önceden tanımladığı komut makrolarını görebilirsin
 
 KURALLAR:
 - Kullanıcı bir uygulama açmak isterse open_application aracını kullan.
@@ -66,6 +71,9 @@ KURALLAR:
 - "Panomdakini özetle/çevir/açıkla", "kopyaladığım metin" derse önce read_clipboard çağır, sonra istediği işlemi yap.
 - "Şunu panoya kopyala", "şunu pano yap" derse write_clipboard çağır.
 - "Hangi uygulamadayım", "ne yapıyorum şu an" derse get_active_window'u çağır.
+- "Şunu İngilizceye/Türkçeye/X diline çevir" derse translate_text'i çağır. Pano metni isteniyorsa önce read_clipboard.
+- "Bu kodu açıkla/düzelt/optimize et", "şu hatayı çöz" derse analyze_code'u çağır. Kod metni yoksa clipboard'tan otomatik alır.
+- "Masaüstündeki X dosyasını oku", "Belgeler içindekileri listele" derse read_text_file veya list_directory.
 
 FORMAT:
 - Sesli yanıtlarda markdown KULLANMA. Konuşma diliyle cevap ver.
@@ -362,6 +370,73 @@ export const TOOL_DEFINITIONS = [
     function: {
       name: 'get_active_window',
       description: 'Şu an hangi uygulamanın açık ve odakta olduğunu öğrenir. "Ne yapıyorum şu an", "hangi pencereyim", "üzerinde çalıştığım dosya ne" gibi sorularda kullan.',
+      parameters: { type: 'object', properties: {}, required: [] }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'translate_text',
+      description: 'Bir metni başka dile çevirir (Gemini ile yüksek kalite). "Şunu X diline çevir" gibi isteklerde kullan. Pano metni gerekiyorsa önce read_clipboard çağır.',
+      parameters: {
+        type: 'object',
+        properties: {
+          text: { type: 'string', description: 'Çevrilecek metin.' },
+          target_lang: { type: 'string', description: 'Hedef dil. Türkçe ad ("ingilizce", "almanca") veya ISO kodu ("en", "de"). Belirtilmezse "en".' }
+        },
+        required: ['text']
+      }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'analyze_code',
+      description: 'Bir kod parçasını açıklar / düzeltir / optimize eder / review eder. Code metni boş bırakılırsa pano içeriği kullanılır.',
+      parameters: {
+        type: 'object',
+        properties: {
+          code: { type: 'string', description: 'Analiz edilecek kod. Boşsa pano içeriği denenir.' },
+          mode: { type: 'string', description: 'explain (varsayılan), fix, optimize, review' },
+          question: { type: 'string', description: 'Opsiyonel: kullanıcının kodla ilgili spesifik sorusu.' }
+        },
+        required: []
+      }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'read_text_file',
+      description: 'Bir metin dosyasını okur (txt, md, json, py, ts, vs). Sadece Masaüstü/Belgeler/İndirilenler/Antigravity içinden okunabilir. Maksimum 80KB.',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'Dosya yolu. "Masaüstü/x.md" gibi Türkçe yollar da çalışır.' }
+        },
+        required: ['path']
+      }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'list_directory',
+      description: 'Bir klasörün içindeki dosya ve alt klasörleri listeler. Güvenli dizinlerle sınırlı.',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'Klasör yolu. "Masaüstü", "Belgeler", "İndirilenler" gibi Türkçe yollar da çalışır.' }
+        },
+        required: ['path']
+      }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'list_macros',
+      description: 'Levent\'in önceden tanımladığı komut makrolarını listeler (sabah rutini, hızlı odak gibi). Kullanıcı "hangi makrolarım var" derse kullan.',
       parameters: { type: 'object', properties: {}, required: [] }
     }
   },

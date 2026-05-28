@@ -24,6 +24,7 @@ interface DahakanAPI {
     askStream: (message: string, onChunk: (chunk: string) => void) => Promise<void>;
     clearHistory: () => Promise<void>;
     greeting: () => Promise<string>;
+    macroMatch: (message: string) => Promise<string[] | null>;
   };
   voice: {
     startListening: () => Promise<void>;
@@ -411,6 +412,20 @@ class DahakanApp {
       this.chatPanel.addMessage(text, 'user');
       await this.handleSleepCommand();
       return;
+    }
+    // Makro eşleşmesi var mı? Varsa adımları sırayla çağır
+    try {
+      const steps = await window.dahakan.ai.macroMatch(text);
+      if (steps && steps.length > 0) {
+        this.chatPanel.addMessage(text, 'user');
+        this.chatPanel.addMessage(`(Makro tetiklendi: ${steps.length} adım çalıştırılıyor)`, 'dahakan');
+        for (const step of steps) {
+          await this.handleUserMessageNoBlock(step);
+        }
+        return;
+      }
+    } catch (err) {
+      console.warn('[Dahakan] Makro kontrol hatası:', err);
     }
 
     this.isProcessing = true;
@@ -1165,6 +1180,16 @@ class DahakanApp {
     });
     window.dahakan.on('dahakan:mute-hotkey', () => {
       this.toggleMicMute();
+    });
+    // Tray menu intents
+    window.dahakan.on('dahakan:tray-briefing', () => {
+      void this.handleUserMessage('Bana brifing ver — sabah/akşam saatine göre.');
+    });
+    window.dahakan.on('dahakan:tray-focus-start', () => {
+      void window.dahakan.features.focusStart(25, 'çalışma');
+    });
+    window.dahakan.on('dahakan:tray-focus-stop', () => {
+      void window.dahakan.features.focusStop();
     });
   }
 

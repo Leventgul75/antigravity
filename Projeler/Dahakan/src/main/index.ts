@@ -101,6 +101,18 @@ function createTray(): void {
   }
   tray = new Tray(icon)
 
+  const send = (channel: string, ...args: unknown[]) => {
+    if (mainWindow) mainWindow.webContents.send(channel, ...args)
+  }
+  const showAndSend = (channel: string, ...args: unknown[]) => {
+    if (!mainWindow) return
+    if (!mainWindow.isVisible()) {
+      mainWindow.show()
+      mainWindow.focus()
+    }
+    mainWindow.webContents.send(channel, ...args)
+  }
+
   const contextMenu = Menu.buildFromTemplate([
     {
       label: 'Dahakan\'ı Göster',
@@ -116,6 +128,27 @@ function createTray(): void {
       click: () => {
         mainWindow?.hide()
       }
+    },
+    { type: 'separator' },
+    {
+      label: 'Ekrana Bak (Vision)',
+      click: () => showAndSend('dahakan:vision-hotkey')
+    },
+    {
+      label: 'Mikrofonu Kıs/Aç (Ctrl+Shift+M)',
+      click: () => send('dahakan:mute-hotkey')
+    },
+    {
+      label: 'Brifing İste',
+      click: () => showAndSend('dahakan:tray-briefing')
+    },
+    {
+      label: 'Odak Modu Başlat (25dk)',
+      click: () => showAndSend('dahakan:tray-focus-start')
+    },
+    {
+      label: 'Odak Modunu Bitir',
+      click: () => showAndSend('dahakan:tray-focus-stop')
     },
     { type: 'separator' },
     {

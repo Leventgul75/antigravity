@@ -5,8 +5,20 @@ import { searchWeb } from '../features/web-search'
 import { analyzeScreen } from '../features/vision'
 import { saveNote, listNotes, findNotes, formatNotesForAI } from '../features/notes'
 import { readClipboard, writeClipboard, getActiveWindow, formatActiveWindowForAI } from '../features/context'
+import { translateText, analyzeCode } from '../features/language'
+import { readTextFile, listDirectory } from '../features/file-ops'
+import { MacroStoreFile, formatMacrosForAI } from '../features/macros'
 import type { Memory } from './memory'
 import type { FocusMode } from '../features/focus-mode'
+
+// Macro store singleton — engine startup'ta initialize edilir
+let macroStore: MacroStoreFile | null = null
+export function setMacroStore(m: MacroStoreFile): void {
+  macroStore = m
+}
+export function getMacroStore(): MacroStoreFile | null {
+  return macroStore
+}
 
 // ReminderManager is injected via setReminderManager since it requires a callback
 interface ReminderHandle {
@@ -180,6 +192,44 @@ export async function executeTool(name: string, args: Record<string, any>): Prom
       case 'get_active_window': {
         const info = await getActiveWindow()
         return formatActiveWindowForAI(info)
+      }
+
+      case 'translate_text': {
+        const text = (args.text as string || '').trim()
+        const targetLang = (args.target_lang as string || 'en').trim()
+        if (!text) return 'Çevrilecek metin boş.'
+        return await translateText(text, targetLang)
+      }
+
+      case 'analyze_code': {
+        const code = (args.code as string || '').trim()
+        const mode = ((args.mode as string || 'explain') as 'explain' | 'fix' | 'optimize' | 'review')
+        const question = (args.question as string || '').trim() || undefined
+        if (!code) {
+          // Boşsa clipboard'a bak — kod oradadır muhtemelen
+          const clip = readClipboard()
+          if (!clip || clip.length < 20) return 'Analiz edilecek kod yok. Panoda da bulamadım.'
+          return await analyzeCode(clip, mode, question)
+        }
+        return await analyzeCode(code, mode, question)
+      }
+
+      case 'read_text_file': {
+        const path = (args.path as string || '').trim()
+        if (!path) return 'Dosya yolu belirtilmedi.'
+        return readTextFile(path)
+      }
+
+      case 'list_directory': {
+        const path = (args.path as string || '').trim()
+        if (!path) return 'Klasör yolu belirtilmedi.'
+        return listDirectory(path)
+      }
+
+      case 'list_macros': {
+        if (!macroStore) return 'Makro deposu henüz hazır değil.'
+        const all = macroStore.list()
+        return formatMacrosForAI(all)
       }
 
       case 'daily_briefing': {

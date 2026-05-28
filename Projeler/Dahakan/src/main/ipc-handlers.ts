@@ -85,6 +85,16 @@ export function setupIpcHandlers(mainWindow: BrowserWindow): void {
     }
   })
 
+  // Makro intent algılama — renderer her kullanıcı utterance'ı için sorar
+  ipcMain.handle('dahakan:macro-match', async (_event, message: string) => {
+    try {
+      return aiEngine.findMatchingMacroSteps(message)
+    } catch (err) {
+      console.error('[Dahakan IPC] macro-match hatası:', err)
+      return null
+    }
+  })
+
   // ─── Vision ────────────────────────────────────────
 
   ipcMain.handle('dahakan:analyze-screen', async (_event, question?: string) => {
