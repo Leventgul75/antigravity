@@ -1,10 +1,11 @@
 import Groq from 'groq-sdk'
 import { buildSystemPrompt, TOOL_DEFINITIONS } from './system-prompt'
-import { executeTool, setMemory, setBriefingProvider, setMacroStore, setLifestyleTracker, setConversationLog } from './tools'
+import { executeTool, setMemory, setBriefingProvider, setMacroStore, setLifestyleTracker, setConversationLog, setSettingsStore } from './tools'
 import { Memory } from './memory'
 import { ConversationLog } from '../features/conversation-log'
 import { MacroStoreFile } from '../features/macros'
 import { LifestyleTracker } from '../features/lifestyle'
+import { SettingsStore } from '../features/settings'
 import { getEnv } from '../utils/env-loader'
 
 interface ChatMessage {
@@ -55,6 +56,8 @@ export class AIEngine {
   private macros: MacroStoreFile
   // Yaşam takip (mood + alışkanlık)
   private lifestyle: LifestyleTracker
+  // Kullanıcı tercihleri
+  public settings: SettingsStore
 
   constructor() {
     const apiKey = getEnv('GROQ_API_KEY')
@@ -63,10 +66,12 @@ export class AIEngine {
     this.log = new ConversationLog()
     this.macros = new MacroStoreFile()
     this.lifestyle = new LifestyleTracker()
+    this.settings = new SettingsStore()
     setMemory(this.memory)
     setMacroStore(this.macros)
     setLifestyleTracker(this.lifestyle)
     setConversationLog(this.log)
+    setSettingsStore(this.settings)
     setBriefingProvider({ generateDailyBriefing: (m, e) => this.generateDailyBriefing(m, e) })
     console.log('[Dahakan AI] Motor başlatıldı, modeller:', MODEL_FALLBACK_CHAIN.join(', '))
   }

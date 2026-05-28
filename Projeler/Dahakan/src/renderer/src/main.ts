@@ -1191,6 +1191,10 @@ class DahakanApp {
     window.dahakan.on('dahakan:tray-focus-stop', () => {
       void window.dahakan.features.focusStop();
     });
+    window.dahakan.on('dahakan:proactive-message', (text: string) => {
+      // TTS zaten main process'te tetikleniyor — burada sadece chat'e bas
+      this.chatPanel.addMessage(text, 'dahakan');
+    });
   }
 
   /* ── Cleanup ──────────────────────────────────────────────── */

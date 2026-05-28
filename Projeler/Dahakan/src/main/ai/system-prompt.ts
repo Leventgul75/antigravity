@@ -57,6 +57,9 @@ YETENEKLERİN:
 - tracker_summary ile son 7 günün takip özetini alabilirsin
 - export_conversation ile günlük sohbet log'unu Masaüstüne aktarabilirsin
 - what_do_you_know ile hafızanda Levent hakkında ne biliyorsan listeleyebilirsin
+- capabilities ile tüm yeteneklerini Levent'e anlatabilirsin
+- health_check ile API ve modül durumunu raporlarsın
+- get_settings / set_setting ile kullanıcı tercihlerini görüp güncelleyebilirsin
 
 KURALLAR:
 - Kullanıcı bir uygulama açmak isterse open_application aracını kullan.
@@ -87,6 +90,10 @@ KURALLAR:
 - "Geçmişte nasıldım", "son haftam nasıl gidiyor" derse tracker_summary.
 - "Sohbeti dosya olarak ver", "bugünü kaydet" derse export_conversation.
 - "Hakkımda ne biliyorsun", "neyi hatırlıyorsun" derse what_do_you_know.
+- "Yardım", "ne yapabilirsin", "yeteneklerin ne" derse capabilities çağır.
+- "Sağlık durumu", "sistem kontrol", "API'lar çalışıyor mu" derse health_check.
+- "Ayarlarımı göster" / "X ayarını Y yap" derse get_settings veya set_setting.
+- Proaktif check-in açmak isterse: set_setting key=proactiveCheckInHours value=N (saat).
 
 FORMAT:
 - Sesli yanıtlarda markdown KULLANMA. Konuşma diliyle cevap ver.
@@ -539,6 +546,45 @@ export const TOOL_DEFINITIONS = [
       name: 'what_do_you_know',
       description: 'Hafızanda Levent hakkında bildiklerini listeler: bilgiler, son sohbet özeti, son web araması.',
       parameters: { type: 'object', properties: {}, required: [] }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'capabilities',
+      description: 'Tüm yeteneklerini kategorize bir şekilde listeler. Levent "ne yapabilirsin", "yardım", "yeteneklerin ne" derse kullan.',
+      parameters: { type: 'object', properties: {}, required: [] }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'health_check',
+      description: 'API anahtarlarının durumunu (Groq, Gemini, ElevenLabs, Perplexity) ve modüllerin sağlığını (hafıza, notlar, log, odak) raporlar.',
+      parameters: { type: 'object', properties: {}, required: [] }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'get_settings',
+      description: 'Mevcut kullanıcı tercihlerini döndürür (proaktif karşılama, auto-sleep süresi, proaktif check-in, Gemini routing, vs).',
+      parameters: { type: 'object', properties: {}, required: [] }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'set_setting',
+      description: 'Bir kullanıcı tercihini günceller. Geçerli anahtarlar: proactiveGreeting (bool), autoSleepMinutes (sayı, 0 kapalı), proactiveCheckInHours (sayı, 0 kapalı), geminiRouting (bool), voiceLanguage (tr/en/de vb), defaultFocusMinutes (sayı).',
+      parameters: {
+        type: 'object',
+        properties: {
+          key: { type: 'string', description: 'Ayar adı (yukarıdaki listeden).' },
+          value: { description: 'Yeni değer — boolean, sayı veya string.' }
+        },
+        required: ['key', 'value']
+      }
     }
   },
   {

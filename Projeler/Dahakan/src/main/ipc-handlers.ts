@@ -1,6 +1,6 @@
 import { app, ipcMain, BrowserWindow } from 'electron'
 import { AIEngine } from './ai/engine'
-import { setReminderManager, setFocusMode } from './ai/tools'
+import { setReminderManager, setFocusMode, setSettingsChangedCb } from './ai/tools'
 import { SpeechToText } from './voice/stt'
 import { TextToSpeech } from './voice/tts'
 import { AudioCapture } from './voice/audio-capture'
@@ -8,6 +8,7 @@ import { ReminderManager } from './features/reminders'
 import { searchWeb } from './features/web-search'
 import { analyzeScreen } from './features/vision'
 import { FocusMode } from './features/focus-mode'
+import { ProactiveScheduler } from './features/proactive'
 import { openApplication, runCommand } from './system/commander'
 import { getSystemInfo } from './system/monitor'
 import { searchFile } from './system/file-manager'
@@ -40,9 +41,31 @@ export function setupIpcHandlers(mainWindow: BrowserWindow): void {
     mainWindow.webContents.send('dahakan:focus-changed', { active, task })
   })
 
+  // Proaktif check-in: Settings'ten saat oranını al, mesaj geldiğinde TTS + renderer'a yansıt
+  const proactive = new ProactiveScheduler({
+    intervalHours: aiEngine.settings.get().proactiveCheckInHours,
+    onMessage: (text: string) => {
+      mainWindow.webContents.send('dahakan:proactive-message', text)
+      void (async () => {
+        try {
+          const audioBuffer = await tts.synthesize(text)
+          mainWindow.webContents.send('dahakan:audio-play', audioBuffer)
+        } catch (err) {
+          console.warn('[Dahakan Proactive] TTS hatası:', err)
+        }
+      })()
+    },
+  })
+
   // Inject reminder + focus mode into tools
   setReminderManager(reminderManager)
   setFocusMode(focusMode)
+  // Set callback: AI set_setting çağırınca proactive scheduler yeniden ayarlansın
+  setSettingsChangedCb((key, value) => {
+    if (key === 'proactiveCheckInHours') {
+      proactive.setIntervalHours(Number(value) || 0)
+    }
+  })
 
   console.log('[Dahakan IPC] Handler\'lar kaydediliyor...')
 
@@ -93,6 +116,25 @@ export function setupIpcHandlers(mainWindow: BrowserWindow): void {
       console.error('[Dahakan IPC] macro-match hatası:', err)
       return null
     }
+  })
+
+  // Settings güncellenirse proaktif scheduler'ı yeniden ayarla
+  ipcMain.handle('dahakan:settings-update', async (_event, key: string, value: unknown) => {
+    try {
+      aiEngine.settings.set(key as any, value as any)
+      // Proaktif check-in saat değişirse yeniden zamanla
+      if (key === 'proactiveCheckInHours') {
+        proactive.setIntervalHours(Number(value) || 0)
+      }
+      return true
+    } catch (err) {
+      console.error('[Dahakan IPC] settings-update hatası:', err)
+      return false
+    }
+  })
+
+  ipcMain.handle('dahakan:settings-get', async () => {
+    return aiEngine.settings.get()
   })
 
   // ─── Vision ────────────────────────────────────────

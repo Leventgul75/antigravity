@@ -9,6 +9,8 @@ import { translateText, analyzeCode } from '../features/language'
 import { readTextFile, listDirectory } from '../features/file-ops'
 import { MacroStoreFile, formatMacrosForAI } from '../features/macros'
 import { getWeather, getNewsBriefing, LifestyleTracker } from '../features/lifestyle'
+import { SettingsStore } from '../features/settings'
+import { formatCapabilitiesForAI, runHealthCheck } from '../features/meta'
 import type { Memory } from './memory'
 import type { FocusMode } from '../features/focus-mode'
 import type { ConversationLog } from '../features/conversation-log'
@@ -16,8 +18,13 @@ import type { ConversationLog } from '../features/conversation-log'
 // Lifestyle tracker + conversation log singleton'ları
 let lifestyleTracker: LifestyleTracker | null = null
 let conversationLog: ConversationLog | null = null
+let settingsStore: SettingsStore | null = null
+// Set sonrası bildirim callback'i (ipc-handlers ProactiveScheduler'ı bu sayede yeniden ayarlar)
+let settingsChangedCb: ((key: string, value: unknown) => void) | null = null
 export function setLifestyleTracker(t: LifestyleTracker): void { lifestyleTracker = t }
 export function setConversationLog(c: ConversationLog): void { conversationLog = c }
+export function setSettingsStore(s: SettingsStore): void { settingsStore = s }
+export function setSettingsChangedCb(cb: (key: string, value: unknown) => void): void { settingsChangedCb = cb }
 
 // Macro store singleton — engine startup'ta initialize edilir
 let macroStore: MacroStoreFile | null = null
@@ -298,6 +305,40 @@ export async function executeTool(name: string, args: Record<string, any>): Prom
           lines.push(`Son web aramam (${ageMin} dk önce): "${web.query}"`)
         }
         return lines.join('\n')
+      }
+
+      case 'capabilities': {
+        return formatCapabilitiesForAI()
+      }
+
+      case 'health_check': {
+        return runHealthCheck({
+          memoryFacts: memory ? memory.getFacts().length : 0,
+          notesCount: listNotes(500).length,
+          conversationDays: conversationLog ? conversationLog.listAvailableDays(365).length : 0,
+          focusActive: focusMode ? focusMode.isActive() : false,
+        })
+      }
+
+      case 'get_settings': {
+        if (!settingsStore) return 'Ayar deposu hazır değil.'
+        return settingsStore.formatForAI()
+      }
+
+      case 'set_setting': {
+        if (!settingsStore) return 'Ayar deposu hazır değil.'
+        const key = (args.key as string || '').trim()
+        const value = args.value
+        if (!key) return 'Ayar adı belirtilmedi.'
+        const validKeys = ['proactiveGreeting', 'autoSleepMinutes', 'proactiveCheckInHours', 'geminiRouting', 'voiceLanguage', 'defaultFocusMinutes']
+        if (!validKeys.includes(key)) return `Bilinmeyen ayar: ${key}. Geçerli: ${validKeys.join(', ')}`
+        try {
+          settingsStore.set(key as any, value as any)
+          if (settingsChangedCb) settingsChangedCb(key, value)
+          return `Ayar güncellendi: ${key} = ${value}`
+        } catch (err) {
+          return `Ayar güncellenemedi: ${(err as Error).message}`
+        }
       }
 
       case 'daily_briefing': {
