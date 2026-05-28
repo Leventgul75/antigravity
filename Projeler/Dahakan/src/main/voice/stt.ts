@@ -54,9 +54,15 @@ function isWhisperHallucination(transcript: string): boolean {
 
 export class SpeechToText {
   private apiKey: string
+  // Whisper'a verilecek dil — default tr; SettingsStore'dan güncellenebilir
+  private language: string = 'tr'
 
   constructor() {
     this.apiKey = getEnv('GROQ_API_KEY')
+  }
+
+  setLanguage(lang: string): void {
+    this.language = (lang || 'tr').toLowerCase().slice(0, 5)
   }
 
   async transcribe(audioBuffer: Buffer): Promise<string> {
@@ -78,7 +84,7 @@ export class SpeechToText {
       const formData = new FormData()
       formData.append('file', file, 'audio.webm')
       formData.append('model', 'whisper-large-v3-turbo')
-      formData.append('language', 'tr')
+      formData.append('language', this.language)
       formData.append('response_format', 'json')
 
       console.log('[Dahakan STT] Groq Whisper\'a gönderiliyor...')

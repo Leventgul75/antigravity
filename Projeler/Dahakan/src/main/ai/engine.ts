@@ -1,6 +1,6 @@
 import Groq from 'groq-sdk'
 import { buildSystemPrompt, TOOL_DEFINITIONS } from './system-prompt'
-import { executeTool, setMemory, setBriefingProvider, setMacroStore, setLifestyleTracker, setConversationLog, setSettingsStore } from './tools'
+import { executeTool, setMemory, setBriefingProvider, setMacroStore, setLifestyleTracker, setConversationLog, setSettingsStore, setAnalyticsProvider } from './tools'
 import { Memory } from './memory'
 import { ConversationLog } from '../features/conversation-log'
 import { MacroStoreFile } from '../features/macros'
@@ -73,6 +73,7 @@ export class AIEngine {
     setConversationLog(this.log)
     setSettingsStore(this.settings)
     setBriefingProvider({ generateDailyBriefing: (m, e) => this.generateDailyBriefing(m, e) })
+    setAnalyticsProvider({ generateConversationAnalytics: (d) => this.generateConversationAnalytics(d) })
     console.log('[Dahakan AI] Motor başlatıldı, modeller:', MODEL_FALLBACK_CHAIN.join(', '))
   }
 
@@ -261,6 +262,45 @@ Karşılama mesajını sadece çıktı olarak yaz, açıklama yapma:`
     } catch (err) {
       console.warn('[Dahakan AI] Karşılama üretilemedi:', err)
       return this.fallbackGreeting(timeOfDay)
+    }
+  }
+
+  /** Son N gün log'ları üzerinde analitik. AI'a Levent'in en sık ne yaptığını,
+   *  hangi konuların geçtiğini özetler. */
+  async generateConversationAnalytics(days: number = 7): Promise<string> {
+    const available = this.log.listAvailableDays(days)
+    if (available.length === 0) return 'Henüz yeterli sohbet log\'un yok.'
+    const segments: string[] = []
+    for (const day of available) {
+      const content = this.log.readDay(day)
+      if (content && content.length > 100) {
+        // Sadece son 2000 karakter — token tasarrufu
+        segments.push(`### ${day}\n${content.slice(-2000)}`)
+      }
+    }
+    if (segments.length === 0) return 'Son günlerin log\'ları boş gibi görünüyor.'
+    const transcript = segments.join('\n\n')
+    const prompt = `Aşağıda Levent ile Dahakan'ın son ${available.length} günlük sohbet log'u var. Şunları analiz et:
+1. En sık geçen konular ve temalar (3-5 madde)
+2. Levent'in çalıştığı projeler / ilgilendiği başlıklar
+3. Tekrar eden istekler veya kalıplar
+4. Bekleyen / yarım kalan işler
+
+Cevabını Türkçe, sade, 5-7 cümle olarak yaz. Markdown KULLANMA, doğal konuşma dili.
+
+LOGLAR:
+${transcript.slice(-12000)}`
+
+    try {
+      const resp = await this.createCompletion({
+        messages: [{ role: 'user', content: prompt }] as any,
+        temperature: 0.4,
+        max_tokens: 600,
+      })
+      return resp.choices?.[0]?.message?.content?.trim() || 'Analiz çıkarılamadı.'
+    } catch (err) {
+      console.warn('[Dahakan AI] Analitik üretilemedi:', err)
+      return 'Analiz yapamadım, daha sonra dene.'
     }
   }
 

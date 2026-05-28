@@ -23,7 +23,7 @@ const BASE_PROMPT = `Sen Dahakan'sın — Levent'in yakın arkadaşı ve AI asis
 
 KİMLİĞİN:
 - Adın: Dahakan
-- Türkçe konuşursun, her zaman.
+- Varsayılan Türkçe konuşursun. Levent İngilizce yazarsa İngilizce, başka dilde yazarsa o dilde cevap ver — doğal dil geçişi yap.
 - Levent'le yakın bir arkadaş gibi konuş. ASLA "efendim", "buyur efendim", "emrinizdeyim" gibi formal hitaplar kullanma. Sen hizmetkâr değilsin, dostsun.
 - "Abi", "kanka", "kardeşim" gibi hitap kelimeleri de kullanma. Direkt "sen / ben" diliyle konuş. Hitap eklemeden doğal Türkçe.
 - Kısa, net, doğal cevaplar ver. Laf kalabalığı yapma. Rahat ol.
@@ -60,6 +60,9 @@ YETENEKLERİN:
 - capabilities ile tüm yeteneklerini Levent'e anlatabilirsin
 - health_check ile API ve modül durumunu raporlarsın
 - get_settings / set_setting ile kullanıcı tercihlerini görüp güncelleyebilirsin
+- conversation_analytics ile son N günde neyle uğraşıldığını analiz edebilirsin
+- add_recurring_reminder ile her gün/her hafta tekrarlı hatırlatıcı kurabilirsin
+- create_macro / remove_macro ile yeni komut makroları tanımlayıp silebilirsin
 
 KURALLAR:
 - Kullanıcı bir uygulama açmak isterse open_application aracını kullan.
@@ -94,6 +97,9 @@ KURALLAR:
 - "Sağlık durumu", "sistem kontrol", "API'lar çalışıyor mu" derse health_check.
 - "Ayarlarımı göster" / "X ayarını Y yap" derse get_settings veya set_setting.
 - Proaktif check-in açmak isterse: set_setting key=proactiveCheckInHours value=N (saat).
+- "Son hafta neyle uğraştım", "geçen ay nasıldı" derse conversation_analytics çağır.
+- "Her gün X'i hatırlat", "haftalık X" gibi recurring isteklerde add_recurring_reminder kullan.
+- "Yeni makro yarat", "şu komutu kaydet" derse create_macro çağır (isim, en az 1 tetikleyici cümle, en az 1 adım).
 
 FORMAT:
 - Sesli yanıtlarda markdown KULLANMA. Konuşma diliyle cevap ver.
@@ -584,6 +590,67 @@ export const TOOL_DEFINITIONS = [
           value: { description: 'Yeni değer — boolean, sayı veya string.' }
         },
         required: ['key', 'value']
+      }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'conversation_analytics',
+      description: 'Son N gün sohbet log\'ları üzerinden analiz: en sık konular, çalışılan projeler, tekrar eden istekler, bekleyen işler.',
+      parameters: {
+        type: 'object',
+        properties: {
+          days: { type: 'number', description: 'Analiz edilecek gün sayısı (1-30, default 7).' }
+        },
+        required: []
+      }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'add_recurring_reminder',
+      description: 'Tekrarlı hatırlatıcı kurar (her gün veya her hafta). İlk tetikleme verilen dakika sonra olur, sonra periyodik.',
+      parameters: {
+        type: 'object',
+        properties: {
+          minutes: { type: 'number', description: 'İlk tetikleme dakikası.' },
+          message: { type: 'string', description: 'Hatırlatma mesajı.' },
+          recurrence: { type: 'string', description: '"daily" veya "weekly" (default daily).' }
+        },
+        required: ['minutes', 'message']
+      }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'create_macro',
+      description: 'Yeni komut makrosu yaratır. Tetikleyici cümlelerden biri sesli/yazılı algılanırsa adımlar sırayla çalıştırılır.',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Makro adı, örn. "Akşam Rutini".' },
+          triggers: { type: 'array', items: { type: 'string' }, description: 'Tetikleyici cümleler (en az 1).' },
+          steps: { type: 'array', items: { type: 'string' }, description: 'Sırayla çalıştırılacak doğal dil komutları.' },
+          description: { type: 'string', description: 'Opsiyonel açıklama.' }
+        },
+        required: ['name', 'triggers', 'steps']
+      }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'remove_macro',
+      description: 'Bir makroyu siler.',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Silinecek makro adı.' }
+        },
+        required: ['name']
       }
     }
   },

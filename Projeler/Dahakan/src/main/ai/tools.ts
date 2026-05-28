@@ -38,9 +38,17 @@ export function getMacroStore(): MacroStoreFile | null {
 // ReminderManager is injected via setReminderManager since it requires a callback
 interface ReminderHandle {
   addReminder: (minutes: number, message: string) => string
+  addRecurringReminder?: (minutes: number, message: string, recurrence: 'once' | 'daily' | 'weekly') => string
   getActiveReminders?: () => Array<{ id: string; message: string; remainingMinutes: number }>
 }
 let reminderManager: ReminderHandle | null = null
+
+// Engine analitik için inject edilir
+interface AnalyticsHandle {
+  generateConversationAnalytics: (days: number) => Promise<string>
+}
+let analyticsProvider: AnalyticsHandle | null = null
+export function setAnalyticsProvider(p: AnalyticsHandle): void { analyticsProvider = p }
 
 // Engine injected by engine setup — daily_briefing buradan çağırır
 interface BriefingHandle {
@@ -323,6 +331,51 @@ export async function executeTool(name: string, args: Record<string, any>): Prom
       case 'get_settings': {
         if (!settingsStore) return 'Ayar deposu hazır değil.'
         return settingsStore.formatForAI()
+      }
+
+      case 'conversation_analytics': {
+        if (!analyticsProvider) return 'Analitik motoru hazır değil.'
+        const days = Number(args.days) || 7
+        return await analyticsProvider.generateConversationAnalytics(Math.max(1, Math.min(30, days)))
+      }
+
+      case 'add_recurring_reminder': {
+        if (!reminderManager?.addRecurringReminder) return 'Tekrarlı hatırlatıcı desteği yok.'
+        const minutes = Number(args.minutes) || 0
+        const message = (args.message as string || '').trim()
+        const recRaw = (args.recurrence as string || 'daily').toLowerCase()
+        const recurrence: 'once' | 'daily' | 'weekly' =
+          recRaw === 'weekly' || recRaw === 'haftalik' || recRaw === 'haftalık' ? 'weekly' :
+          recRaw === 'once' || recRaw === 'tekseferlik' ? 'once' : 'daily'
+        if (minutes <= 0 || !message) return 'Süre ve mesaj gerekli.'
+        const id = reminderManager.addRecurringReminder(minutes, message, recurrence)
+        const recLabel = recurrence === 'daily' ? 'her gün' : recurrence === 'weekly' ? 'her hafta' : 'tek sefer'
+        return `Tekrarlı hatırlatıcı kuruldu: "${message}" — ilk tetikleme ${minutes} dk sonra, sonra ${recLabel}. (ID: ${id})`
+      }
+
+      case 'create_macro': {
+        if (!macroStore) return 'Makro deposu hazır değil.'
+        const name = (args.name as string || '').trim()
+        const triggers = args.triggers
+        const steps = args.steps
+        const description = (args.description as string || '').trim() || undefined
+        if (!name) return 'Makro adı boş.'
+        if (!Array.isArray(triggers) || triggers.length === 0) return 'En az 1 tetikleyici cümle gerekli.'
+        if (!Array.isArray(steps) || steps.length === 0) return 'En az 1 adım gerekli.'
+        const added = macroStore.add({
+          name,
+          trigger: triggers as string[],
+          steps: steps as string[],
+          description,
+        })
+        return added ? `"${name}" makrosu eklendi. Tetikleyiciler: ${(triggers as string[]).join(', ')}.` : 'Makro eklenemedi.'
+      }
+
+      case 'remove_macro': {
+        if (!macroStore) return 'Makro deposu hazır değil.'
+        const name = (args.name as string || '').trim()
+        if (!name) return 'Makro adı belirtilmedi.'
+        return macroStore.remove(name) ? `"${name}" makrosu silindi.` : `"${name}" adında makro bulunamadı.`
       }
 
       case 'set_setting': {

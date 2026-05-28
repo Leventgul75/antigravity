@@ -21,6 +21,8 @@ export function setupIpcHandlers(mainWindow: BrowserWindow): void {
   const stt = new SpeechToText()
   const tts = new TextToSpeech()
   const audioCapture = new AudioCapture()
+  // Settings'ten dil çek + STT'yi ayarla
+  stt.setLanguage(aiEngine.settings.get().voiceLanguage)
 
   const reminderManager = new ReminderManager((message: string) => {
     // Renderer'a bildir — chat'te göstersin
@@ -60,10 +62,13 @@ export function setupIpcHandlers(mainWindow: BrowserWindow): void {
   // Inject reminder + focus mode into tools
   setReminderManager(reminderManager)
   setFocusMode(focusMode)
-  // Set callback: AI set_setting çağırınca proactive scheduler yeniden ayarlansın
+  // Set callback: AI set_setting çağırınca proactive scheduler + STT lang güncellensin
   setSettingsChangedCb((key, value) => {
     if (key === 'proactiveCheckInHours') {
       proactive.setIntervalHours(Number(value) || 0)
+    }
+    if (key === 'voiceLanguage') {
+      stt.setLanguage(String(value || 'tr'))
     }
   })
 
